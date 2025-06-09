@@ -124,35 +124,35 @@ impl WebSocketConnectionBuilder {
 
     /// Enable/disable automatic reconnection
     #[must_use]
-    pub fn auto_reconnect(mut self, enabled: bool) -> Self {
+    pub const fn auto_reconnect(mut self, enabled: bool) -> Self {
         self.auto_reconnect = enabled;
         self
     }
 
     /// Set ping interval
     #[must_use]
-    pub fn ping_interval(mut self, interval: Duration) -> Self {
+    pub const fn ping_interval(mut self, interval: Duration) -> Self {
         self.ping_interval = Some(interval);
         self
     }
 
     /// Set pong timeout
     #[must_use]
-    pub fn pong_timeout(mut self, timeout: Duration) -> Self {
+    pub const fn pong_timeout(mut self, timeout: Duration) -> Self {
         self.pong_timeout = Some(timeout);
         self
     }
 
     /// Set maximum message size
     #[must_use]
-    pub fn max_message_size(mut self, size: u32) -> Self {
+    pub const fn max_message_size(mut self, size: u32) -> Self {
         self.max_message_size = Some(size);
         self
     }
 
     /// Enable compression
     #[must_use]
-    pub fn compression(mut self, enabled: bool) -> Self {
+    pub const fn compression(mut self, enabled: bool) -> Self {
         self.compression_enabled = enabled;
         self
     }
@@ -165,6 +165,10 @@ impl WebSocketConnectionBuilder {
     }
 
     /// Connect using the specified client
+    ///
+    /// # Errors
+    ///
+    /// Returns `NetworkError` if connection fails
     pub async fn connect(self, client: &dyn WebSocketClientTrait) -> NetworkResult<ConnectionId> {
         // For now, use basic connection - in full implementation, this would pass all options
         client.connect(&self.url).await
@@ -235,6 +239,7 @@ pub struct PrioritizedMessage {
 
 impl PrioritizedMessage {
     /// Create new prioritized message
+    #[must_use]
     pub fn new(message: WebSocketMessage, priority: MessagePriority) -> Self {
         Self {
             message,
@@ -245,26 +250,30 @@ impl PrioritizedMessage {
     }
 
     /// Create high priority message
+    #[must_use]
     pub fn high_priority(message: WebSocketMessage) -> Self {
         Self::new(message, MessagePriority::High)
     }
 
     /// Create critical priority message
+    #[must_use]
     pub fn critical(message: WebSocketMessage) -> Self {
         Self::new(message, MessagePriority::Critical)
     }
 
     /// Get message age
+    #[must_use]
     pub fn age(&self) -> Duration {
         self.timestamp.elapsed()
     }
 
     /// Increment retry count
-    pub fn increment_retry(&mut self) {
+    pub const fn increment_retry(&mut self) {
         self.retry_count += 1;
     }
 
     /// Check if message has expired
+    #[must_use]
     pub fn is_expired(&self, max_age: Duration) -> bool {
         self.age() > max_age
     }
@@ -329,6 +338,6 @@ mod tests {
         let stats = WebSocketClientStats::default();
         assert_eq!(stats.active_connections, 0);
         assert_eq!(stats.total_messages_sent, 0);
-        assert_eq!(stats.connection_uptime_percentage, 0.0_f64);
+        assert!((stats.connection_uptime_percentage - 0.0_f64).abs() < f64::EPSILON);
     }
 }

@@ -10,12 +10,12 @@ use crate::http::circuit_breaker::CircuitBreakerConfig;
 use crate::types::{HttpRequest, HttpResponse, HttpMethod};
 use async_trait::async_trait;
 use dashmap::DashMap;
-use reqwest::{Client, Method, RequestBuilder};
+use reqwest::{Client, Method};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, instrument};
 
 /// High-performance HTTP client implementation
 pub struct HttpClient {
@@ -34,7 +34,7 @@ pub struct HttpClient {
 }
 
 /// Statistics per host
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct HostStats {
     /// Total requests to this host
     total_requests: AtomicU64,
@@ -71,8 +71,6 @@ struct GlobalStats {
     failed_requests: AtomicU64,
     /// Average response time (microseconds)
     avg_response_time_us: AtomicU64,
-    /// Client start time
-    start_time: Instant,
 }
 
 impl Default for GlobalStats {
@@ -82,7 +80,6 @@ impl Default for GlobalStats {
             successful_responses: AtomicU64::new(0),
             failed_requests: AtomicU64::new(0),
             avg_response_time_us: AtomicU64::new(0),
-            start_time: Instant::now(),
         }
     }
 }
@@ -138,14 +135,12 @@ impl HttpClient {
     }
 
     /// Extract host from URL for statistics tracking
-    fn extract_host(&self, url: &str) -> String {
-        url::Url::parse(url)
-            .map(|u| u.host_str().unwrap_or("unknown").to_string())
-            .unwrap_or_else(|_| "unknown".to_string())
+    fn extract_host(url: &str) -> String {
+        url::Url::parse(url).map_or_else(|_| "unknown".to_string(), |u| u.host_str().map_or_else(|| "unknown".to_string(), ToString::to_string))
     }
 
     /// Convert our HTTP method to reqwest method
-    fn convert_method(&self, method: HttpMethod) -> Method {
+    const fn convert_method(method: HttpMethod) -> Method {
         match method {
             HttpMethod::Get => Method::GET,
             HttpMethod::Post => Method::POST,
@@ -158,8 +153,8 @@ impl HttpClient {
     }
 
     /// Build reqwest request from our request type
-    fn build_request(&self, request: &HttpRequest) -> NetworkResult<RequestBuilder> {
-        let method = self.convert_method(request.method);
+    fn build_request(&self, request: &HttpRequest) -> reqwest::RequestBuilder {
+        let method = Self::convert_method(request.method);
         let mut req_builder = self.client.request(method, &request.url);
 
         // Add headers
@@ -177,12 +172,12 @@ impl HttpClient {
             req_builder = req_builder.timeout(timeout);
         }
 
-        Ok(req_builder)
+        req_builder
     }
 
     /// Record request statistics
     fn record_request_stats(&self, host: &str, latency: Duration, success: bool) {
-        let latency_us = latency.as_micros() as u64;
+        let latency_us = u64::try_from(latency.as_micros()).unwrap_or(u64::MAX);
 
         // Update global stats
         self.global_stats.total_requests.fetch_add(1, Ordering::Relaxed);
@@ -224,19 +219,20 @@ impl HttpClient {
         if let Ok(mut last_request) = host_stats.last_request_at.try_write() {
             *last_request = Some(Instant::now());
         }
+        drop(host_stats);
     }
 
     /// Execute HTTP request with circuit breaker protection
     #[instrument(skip(self, request), fields(method = %request.method, url = %request.url))]
     async fn execute_request(&self, request: HttpRequest) -> NetworkResult<HttpResponse> {
-        let host = self.extract_host(&request.url);
+        let host = Self::extract_host(&request.url);
         let start_time = Instant::now();
 
         // Increment active requests counter
         self.active_requests.fetch_add(1, Ordering::Relaxed);
 
         let result = self.circuit_breaker.execute(|| async {
-            let req_builder = self.build_request(&request)?;
+            let req_builder = self.build_request(&request);
             
             debug!("Sending HTTP request: {} {}", request.method, request.url);
             
@@ -322,12 +318,17 @@ impl HttpClientTrait for HttpClient {
     /// Get client statistics
     fn stats(&self) -> crate::http::HttpClientStats {
         let pool_utilization = {
-            let active = self.active_requests.load(Ordering::Relaxed) as f64;
-            let max_per_host = self.config.max_connections_per_host as f64;
-            let host_count = self.host_stats.len() as f64;
-            let total_capacity = max_per_host * host_count.max(1.0_f64);
+            let active = self.active_requests.load(Ordering::Relaxed);
+            let max_per_host = f64::from(self.config.max_connections_per_host);
+            let host_count = self.host_stats.len();
+            let host_count_f64 = if host_count == 0 {
+                1.0_f64
+            } else {
+                u32::try_from(host_count).map_or(f64::INFINITY, f64::from)
+            };
+            let total_capacity = max_per_host * host_count_f64;
             if total_capacity > 0.0_f64 {
-                active / total_capacity
+                f64::from(u32::try_from(active).unwrap_or(u32::MAX)) / total_capacity
             } else {
                 0.0_f64
             }
@@ -338,7 +339,7 @@ impl HttpClientTrait for HttpClient {
             successful_responses: self.global_stats.successful_responses.load(Ordering::Relaxed),
             failed_requests: self.global_stats.failed_requests.load(Ordering::Relaxed),
             avg_response_time_us: self.global_stats.avg_response_time_us.load(Ordering::Relaxed),
-            active_connections: self.active_requests.load(Ordering::Relaxed) as u32,
+            active_connections: u32::try_from(self.active_requests.load(Ordering::Relaxed)).unwrap_or(u32::MAX),
             pool_utilization,
             circuit_breaker_state: futures::executor::block_on(self.circuit_breaker.state()),
         }
@@ -356,6 +357,7 @@ impl HttpClientTrait for HttpClient {
 
 impl HttpClient {
     /// Get detailed statistics for a specific host
+    #[must_use]
     pub fn host_stats(&self, host: &str) -> Option<HostStatsSnapshot> {
         self.host_stats.get(host).map(|stats| {
             let last_request_at = futures::executor::block_on(async {
@@ -374,6 +376,7 @@ impl HttpClient {
     }
 
     /// Get statistics for all hosts
+    #[must_use]
     pub fn all_host_stats(&self) -> Vec<HostStatsSnapshot> {
         self.host_stats
             .iter()
@@ -427,7 +430,8 @@ impl HttpClient {
     }
 
     /// Get configuration
-    pub fn config(&self) -> &HttpConfig {
+    #[must_use]
+    pub const fn config(&self) -> &HttpConfig {
         &self.config
     }
 
@@ -464,7 +468,7 @@ impl HostStatsSnapshot {
         if self.total_requests == 0 {
             0.0_f64
         } else {
-            self.successful_requests as f64 / self.total_requests as f64
+            f64::from(u32::try_from(self.successful_requests).unwrap_or(u32::MAX)) / f64::from(u32::try_from(self.total_requests).unwrap_or(u32::MAX))
         }
     }
 
@@ -509,37 +513,40 @@ mod tests {
     }
 
     #[test]
-    fn test_method_conversion() {
+    fn test_method_conversion() -> Result<(), Box<dyn std::error::Error>> {
         let config = create_test_config();
-        let client = HttpClient::new(config).unwrap();
+        let _client = HttpClient::new(config).map_err(|e| format!("Failed to create HTTP client: {e}"))?;
 
-        assert_eq!(client.convert_method(HttpMethod::Get), Method::GET);
-        assert_eq!(client.convert_method(HttpMethod::Post), Method::POST);
-        assert_eq!(client.convert_method(HttpMethod::Put), Method::PUT);
-        assert_eq!(client.convert_method(HttpMethod::Delete), Method::DELETE);
+        assert_eq!(HttpClient::convert_method(HttpMethod::Get), Method::GET);
+        assert_eq!(HttpClient::convert_method(HttpMethod::Post), Method::POST);
+        assert_eq!(HttpClient::convert_method(HttpMethod::Put), Method::PUT);
+        assert_eq!(HttpClient::convert_method(HttpMethod::Delete), Method::DELETE);
+        Ok(())
     }
 
     #[test]
-    fn test_host_extraction() {
+    fn test_host_extraction() -> Result<(), Box<dyn std::error::Error>> {
         let config = create_test_config();
-        let client = HttpClient::new(config).unwrap();
+        let _client = HttpClient::new(config).map_err(|e| format!("Failed to create HTTP client: {e}"))?;
 
-        assert_eq!(client.extract_host("https://api.example.com/path"), "api.example.com");
-        assert_eq!(client.extract_host("http://localhost:8080"), "localhost");
-        assert_eq!(client.extract_host("invalid-url"), "unknown");
+        assert_eq!(HttpClient::extract_host("https://api.example.com/path"), "api.example.com");
+        assert_eq!(HttpClient::extract_host("http://localhost:8080"), "localhost");
+        assert_eq!(HttpClient::extract_host("invalid-url"), "unknown");
+        Ok(())
     }
 
     #[test]
-    fn test_stats_initialization() {
+    fn test_stats_initialization() -> Result<(), Box<dyn std::error::Error>> {
         let config = create_test_config();
-        let client = HttpClient::new(config).unwrap();
+        let client = HttpClient::new(config).map_err(|e| format!("Failed to create HTTP client: {e}"))?;
         let stats = client.stats();
 
         assert_eq!(stats.total_requests, 0);
         assert_eq!(stats.successful_responses, 0);
         assert_eq!(stats.failed_requests, 0);
         assert_eq!(stats.active_connections, 0);
-        assert_eq!(stats.pool_utilization, 0.0_f64);
+        assert!((stats.pool_utilization - 0.0_f64).abs() < f64::EPSILON);
+        Ok(())
     }
 
     #[test]
@@ -553,8 +560,9 @@ mod tests {
             last_request_at: Some(Instant::now()),
         };
 
-        assert_eq!(snapshot.success_rate(), 0.95_f64);
-        assert_eq!(snapshot.failure_rate(), 0.05_f64);
+        assert!((snapshot.success_rate() - 0.95_f64).abs() < f64::EPSILON);
+        assert!((snapshot.failure_rate() - 0.05_f64).abs() < f64::EPSILON);
         assert!(snapshot.is_healthy());
+
     }
 }

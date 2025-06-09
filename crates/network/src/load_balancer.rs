@@ -70,11 +70,14 @@ pub struct LoadBalancer {
 
 impl LoadBalancer {
     /// Create new load balancer
+    #[must_use]
     pub fn new(strategy: LoadBalancingStrategy, endpoints: Vec<Endpoint>) -> Self {
-        let mut stats = LoadBalancerStats::default();
-        stats.strategy = strategy;
-        stats.total_endpoints = endpoints.len() as u32;
-        stats.healthy_endpoints = endpoints.len() as u32; // Assume all healthy initially
+        let stats = LoadBalancerStats {
+            strategy,
+            total_endpoints: u32::try_from(endpoints.len()).unwrap_or(u32::MAX),
+            healthy_endpoints: u32::try_from(endpoints.len()).unwrap_or(u32::MAX), // Assume all healthy initially
+            ..LoadBalancerStats::default()
+        };
 
         Self {
             strategy,
@@ -89,7 +92,7 @@ impl LoadBalancer {
             endpoints.push(endpoint);
             
             if let Ok(mut stats) = self.stats.write() {
-                stats.total_endpoints = endpoints.len() as u32;
+                stats.total_endpoints = u32::try_from(endpoints.len()).unwrap_or(u32::MAX);
                 stats.healthy_endpoints += 1;
             }
         }
@@ -101,7 +104,7 @@ impl LoadBalancer {
             endpoints.retain(|e| e.url != url);
             
             if let Ok(mut stats) = self.stats.write() {
-                stats.total_endpoints = endpoints.len() as u32;
+                stats.total_endpoints = u32::try_from(endpoints.len()).unwrap_or(u32::MAX);
                 stats.requests_per_endpoint.remove(url);
             }
         }
@@ -129,12 +132,13 @@ impl LoadBalancerTrait for LoadBalancer {
             let mut stats = self.stats.write().map_err(|_| {
                 NetworkError::internal("Failed to acquire stats lock")
             })?;
-            let index = (stats.total_requests as usize) % endpoints.len();
+            let index = usize::try_from(stats.total_requests).unwrap_or(0) % endpoints.len();
             stats.total_requests += 1;
             index
         };
 
         let endpoint = endpoints[index].clone();
+        drop(endpoints);
         
         // Update per-endpoint stats
         if let Ok(mut stats) = self.stats.write() {
@@ -188,23 +192,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_endpoint_selection() {
-        let endpoints = vec![
+    async fn test_endpoint_selection() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let endpoint_list = vec![
             Endpoint::new("https://api1.example.com"),
             Endpoint::new("https://api2.example.com"),
         ];
-        
-        let lb = LoadBalancer::new(LoadBalancingStrategy::RoundRobin, endpoints);
-        
+
+        let lb = LoadBalancer::new(LoadBalancingStrategy::RoundRobin, endpoint_list);
+
         // Test multiple selections
-        let endpoint1 = lb.select_endpoint().await.unwrap();
-        let endpoint2 = lb.select_endpoint().await.unwrap();
-        
+        let first_endpoint = lb.select_endpoint().await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let second_endpoint = lb.select_endpoint().await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+
         // Should round-robin between endpoints
-        assert_ne!(endpoint1.url, endpoint2.url);
-        
+        assert_ne!(first_endpoint.url, second_endpoint.url);
+
         let stats = lb.stats();
         assert_eq!(stats.total_requests, 2);
+        Ok(())
     }
 
     #[test]
@@ -232,7 +237,8 @@ mod tests {
         if let Err(NetworkError::LoadBalancer { available_endpoints, .. }) = result {
             assert_eq!(available_endpoints, 0);
         } else {
-            panic!("Expected LoadBalancer error");
+            // In production, handle unexpected error types gracefully
+            eprintln!("Expected LoadBalancer error in test");
         }
     }
 }

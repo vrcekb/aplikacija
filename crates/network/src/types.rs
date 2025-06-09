@@ -65,14 +65,14 @@ impl Endpoint {
 
     /// Set priority
     #[must_use]
-    pub fn with_priority(mut self, priority: u32) -> Self {
+    pub const fn with_priority(mut self, priority: u32) -> Self {
         self.priority = priority;
         self
     }
 
     /// Set weight
     #[must_use]
-    pub fn with_weight(mut self, weight: u32) -> Self {
+    pub const fn with_weight(mut self, weight: u32) -> Self {
         self.weight = weight;
         self
     }
@@ -86,7 +86,7 @@ impl Endpoint {
 }
 
 /// Health check configuration
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct HealthCheckConfig {
     /// Health check interval
     pub interval: Duration,
@@ -154,6 +154,7 @@ pub struct ConnectionStats {
 
 impl ConnectionStats {
     /// Create new connection statistics
+    #[must_use]
     pub fn new(connection_id: ConnectionId) -> Self {
         Self {
             connection_id,
@@ -206,6 +207,7 @@ impl ConnectionStats {
     }
 
     /// Get current statistics snapshot
+    #[must_use]
     pub fn snapshot(&self) -> ConnectionStatsSnapshot {
         ConnectionStatsSnapshot {
             connection_id: self.connection_id,
@@ -319,8 +321,12 @@ impl HttpRequest {
     }
 
     /// Set JSON body
+    ///
+    /// # Errors
+    ///
+    /// Returns `NetworkError` if JSON serialization fails
     pub fn json_body<T: Serialize>(mut self, data: &T) -> NetworkResult<Self> {
-        let json_bytes = serde_json::to_vec(data)?;
+        let json_bytes = serde_json::to_vec(data).map_err(crate::error::NetworkError::from)?;
         self.headers.insert("Content-Type".to_string(), "application/json".to_string());
         self.body = Some(json_bytes);
         Ok(self)
@@ -328,7 +334,7 @@ impl HttpRequest {
 
     /// Set timeout
     #[must_use]
-    pub fn timeout(mut self, timeout: Duration) -> Self {
+    pub const fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
@@ -349,11 +355,19 @@ pub struct HttpResponse {
 
 impl HttpResponse {
     /// Parse JSON response body
+    ///
+    /// # Errors
+    ///
+    /// Returns `NetworkError` if JSON deserialization fails
     pub fn json<T: for<'de> Deserialize<'de>>(&self) -> NetworkResult<T> {
-        serde_json::from_slice(&self.body).map_err(Into::into)
+        serde_json::from_slice(&self.body).map_err(crate::error::NetworkError::from)
     }
 
     /// Get response body as string
+    ///
+    /// # Errors
+    ///
+    /// Returns `NetworkError` if UTF-8 conversion fails
     pub fn text(&self) -> NetworkResult<String> {
         String::from_utf8(self.body.clone()).map_err(|e| {
             crate::error::NetworkError::internal(format!("Invalid UTF-8 in response: {e}"))
@@ -465,7 +479,7 @@ mod tests {
     }
 
     #[test]
-    fn test_http_response() {
+    fn test_http_response() -> Result<(), Box<dyn std::error::Error>> {
         let response = HttpResponse {
             status_code: 200,
             headers: HashMap::new(),
@@ -477,7 +491,8 @@ mod tests {
         assert!(!response.is_client_error());
         assert!(!response.is_server_error());
 
-        let text = response.text().unwrap();
+        let text = response.text().map_err(|e| format!("Failed to get response text: {e}"))?;
         assert_eq!(text, "Hello, World!");
+        Ok(())
     }
 }

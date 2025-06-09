@@ -127,6 +127,7 @@ pub struct CircuitBreaker {
 
 impl CircuitBreaker {
     /// Create new circuit breaker
+    #[must_use]
     pub fn new(config: CircuitBreakerConfig) -> Self {
         Self {
             config,
@@ -152,7 +153,8 @@ impl CircuitBreaker {
             CircuitBreakerState::Closed => true,
             CircuitBreakerState::Open => {
                 // Check if timeout has elapsed to transition to half-open
-                if let Some(opened_time) = *self.opened_at.read().await {
+                let value = *self.opened_at.read().await;
+                if let Some(opened_time) = value {
                     if opened_time.elapsed() >= self.config.timeout {
                         self.transition_to_half_open().await;
                         true
@@ -172,6 +174,10 @@ impl CircuitBreaker {
     }
 
     /// Execute operation with circuit breaker protection
+    ///
+    /// # Errors
+    ///
+    /// Returns `NetworkError` if circuit breaker is open or operation fails
     pub async fn execute<F, Fut, T>(&self, operation: F) -> NetworkResult<T>
     where
         F: FnOnce() -> Fut,

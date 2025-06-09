@@ -99,6 +99,10 @@ impl HttpRequestBuilder {
     }
 
     /// Set JSON body
+    ///
+    /// # Errors
+    ///
+    /// Returns `NetworkError` if JSON serialization fails
     pub fn json<T: serde::Serialize>(mut self, data: &T) -> NetworkResult<Self> {
         self.request = self.request.json_body(data)?;
         Ok(self)
@@ -127,12 +131,16 @@ impl HttpRequestBuilder {
 
     /// Disable circuit breaker for this request
     #[must_use]
-    pub fn disable_circuit_breaker(mut self) -> Self {
+    pub const fn disable_circuit_breaker(mut self) -> Self {
         self.circuit_breaker_enabled = false;
         self
     }
 
     /// Send the request
+    ///
+    /// # Errors
+    ///
+    /// Returns `NetworkError` if request fails
     pub async fn send(self, client: &dyn HttpClientTrait) -> NetworkResult<HttpResponse> {
         if let Some(retry_policy) = self.retry_policy {
             client.send_with_retry(self.request, retry_policy).await
@@ -176,7 +184,7 @@ mod tests {
     use crate::types::HttpMethod;
 
     #[test]
-    fn test_request_builder() -> NetworkResult<()> {
+    fn test_request_builder() {
         let builder = HttpRequestBuilder::get("https://api.example.com/data")
             .header("Authorization", "Bearer token")
             .timeout(std::time::Duration::from_secs(30))
@@ -187,7 +195,7 @@ mod tests {
         assert!(builder.request.headers.contains_key("Authorization"));
         assert!(builder.retry_policy.is_some());
 
-        Ok(())
+
     }
 
     #[test]
@@ -208,6 +216,6 @@ mod tests {
         assert_eq!(stats.total_requests, 0);
         assert_eq!(stats.successful_responses, 0);
         assert_eq!(stats.failed_requests, 0);
-        assert_eq!(stats.pool_utilization, 0.0_f64);
+        assert!((stats.pool_utilization - 0.0_f64).abs() < f64::EPSILON);
     }
 }

@@ -211,18 +211,18 @@ impl WebSocketManager {
     }
 
     /// Get manager statistics
+    #[must_use]
     pub async fn stats(&self) -> ManagerStats {
         self.stats.read().await.clone()
     }
 
     /// Check if manager is healthy
+    #[must_use]
     pub async fn is_healthy(&self) -> bool {
         let stats = self.stats().await;
         let active_ratio = if stats.total_connection_attempts > 0 {
-            #[allow(clippy::cast_precision_loss)]
-            let active_f64 = stats.active_connections as f64;
-            #[allow(clippy::cast_precision_loss)]
-            let total_f64 = stats.total_connection_attempts as f64;
+            let active_f64 = f64::from(u32::try_from(stats.active_connections).unwrap_or(u32::MAX));
+            let total_f64 = f64::from(u32::try_from(stats.total_connection_attempts).unwrap_or(u32::MAX));
             active_f64 / total_f64
         } else {
             1.0_f64
@@ -412,10 +412,8 @@ impl ManagerStats {
         if self.total_connection_attempts == 0 {
             0.0_f64
         } else {
-            #[allow(clippy::cast_precision_loss)]
-            let successful_f64 = self.successful_connections as f64;
-            #[allow(clippy::cast_precision_loss)]
-            let total_f64 = self.total_connection_attempts as f64;
+            let successful_f64 = f64::from(u32::try_from(self.successful_connections).unwrap_or(u32::MAX));
+            let total_f64 = f64::from(u32::try_from(self.total_connection_attempts).unwrap_or(u32::MAX));
             successful_f64 / total_f64
         }
     }
@@ -428,6 +426,7 @@ impl ManagerStats {
 }
 
 /// Calculate reconnection delay with exponential backoff
+#[must_use]
 fn calculate_reconnect_delay(attempt: u32, config: &crate::config::ReconnectConfig) -> Duration {
     let base_delay = Duration::from_millis(config.initial_delay_ms);
     let max_delay = Duration::from_millis(config.max_delay_ms);
@@ -437,13 +436,25 @@ fn calculate_reconnect_delay(attempt: u32, config: &crate::config::ReconnectConf
     }
     
     let multiplier = config.backoff_multiplier.powi(i32::try_from(attempt - 1).unwrap_or(0_i32));
-    #[allow(clippy::cast_precision_loss)]
-    #[allow(clippy::cast_possible_truncation)]
-    #[allow(clippy::cast_sign_loss)]
     let delay = Duration::from_millis({
-        let base_millis_f64 = base_delay.as_millis() as f64;
-        let result = base_millis_f64 * multiplier;
-        result as u64
+        let base_millis = u64::try_from(base_delay.as_millis()).unwrap_or(u64::MAX);
+
+        // Use safe arithmetic to avoid precision loss
+        let max_safe_u64 = 2_u64.pow(52); // f64 mantissa precision limit
+        if base_millis > max_safe_u64 {
+            u64::MAX // Avoid precision loss for very large values
+        } else {
+            #[allow(clippy::cast_precision_loss)] // Checked above
+            let result = (base_millis as f64 * multiplier).round();
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)] // Bounds checked
+            if result >= u64::MAX as f64 {
+                u64::MAX
+            } else if result < 0.0_f64 {
+                0_u64
+            } else {
+                result as u64
+            }
+        }
     });
     
     delay.min(max_delay)

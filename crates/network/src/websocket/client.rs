@@ -103,7 +103,7 @@ impl WebSocketClientTrait for WebSocketClient {
     fn stats(&self) -> WebSocketClientStats {
         self.stats.read().map_or_else(
             |_| WebSocketClientStats::default(),
-            |stats| stats.clone()
+            |stats| (*stats).clone()
         )
     }
 

@@ -1,19 +1,19 @@
 //! Network Manager
 //!
-//! Central orchestrator for all network operations in TallyIO.
+//! Central orchestrator for all network operations in `TallyIO`.
 //! Provides unified interface for HTTP, WebSocket, and P2P networking.
 
 use crate::config::NetworkConfig;
-use crate::error::{NetworkError, NetworkResult};
+use crate::error::NetworkResult;
 use crate::http::{HttpClient, HttpClientTrait};
 use crate::load_balancer::{LoadBalancer, LoadBalancerTrait};
 use crate::metrics::NetworkMetrics;
 use crate::p2p::{P2PNetwork, P2PNetworkTrait};
 use crate::types::{ConnectionId, Endpoint, HttpRequest, HttpResponse, WebSocketMessage};
-use crate::websocket::{WebSocketClient as WsClient, WebSocketClientTrait};
+use crate::websocket::WebSocketClientTrait;
 use std::sync::Arc;
 use tallyio_core::prelude::*;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, info, instrument};
 
 /// Network manager - central orchestrator for all network operations
 pub struct NetworkManager {
@@ -70,12 +70,12 @@ impl NetworkManager {
         debug!("Load balancer initialized with {} endpoints", config.load_balancer.endpoints.len());
 
         // Initialize P2P network if configured
-        let p2p_network = if let Some(p2p_config) = &config.p2p {
-            let p2p_net = P2PNetwork::new(p2p_config.clone());
-            Some(Arc::new(p2p_net))
-        } else {
-            None
-        };
+        let p2p_network = config.p2p.as_ref().map(|_p2p_config| {
+            // Convert config::P2PConfig to p2p::P2PConfig
+            let p2p_config = crate::p2p::P2PConfig::default(); // TODO: Convert from config
+            let p2p_net = P2PNetwork::new(p2p_config);
+            Arc::new(p2p_net)
+        });
 
         if p2p_network.is_some() {
             debug!("P2P network initialized");
@@ -99,32 +99,38 @@ impl NetworkManager {
     }
 
     /// Get HTTP client
-    pub fn http_client(&self) -> &Arc<HttpClient> {
+    #[must_use]
+    pub const fn http_client(&self) -> &Arc<HttpClient> {
         &self.http_client
     }
 
     /// Get WebSocket client
-    pub fn websocket_client(&self) -> &Arc<WebSocketClientStub> {
+    #[must_use]
+    pub const fn websocket_client(&self) -> &Arc<WebSocketClientStub> {
         &self.websocket_client
     }
 
     /// Get load balancer
-    pub fn load_balancer(&self) -> &Arc<LoadBalancer> {
+    #[must_use]
+    pub const fn load_balancer(&self) -> &Arc<LoadBalancer> {
         &self.load_balancer
     }
 
     /// Get P2P network (if available)
-    pub fn p2p_network(&self) -> Option<&Arc<P2PNetwork>> {
+    #[must_use]
+    pub const fn p2p_network(&self) -> Option<&Arc<P2PNetwork>> {
         self.p2p_network.as_ref()
     }
 
     /// Get metrics
-    pub fn metrics(&self) -> &Arc<NetworkMetrics> {
+    #[must_use]
+    pub const fn metrics(&self) -> &Arc<NetworkMetrics> {
         &self.metrics
     }
 
     /// Get configuration
-    pub fn config(&self) -> &NetworkConfig {
+    #[must_use]
+    pub const fn config(&self) -> &NetworkConfig {
         &self.config
     }
 
@@ -235,6 +241,7 @@ impl NetworkManager {
     }
 
     /// Get comprehensive network statistics
+    #[must_use]
     pub fn network_stats(&self) -> NetworkStats {
         NetworkStats {
             http: self.http_client.stats(),
@@ -246,6 +253,7 @@ impl NetworkManager {
     }
 
     /// Check overall network health
+    #[must_use]
     pub fn is_healthy(&self) -> bool {
         let http_healthy = self.http_client.is_healthy();
         let websocket_healthy = self.websocket_client.is_healthy();
@@ -376,15 +384,22 @@ pub struct WebSocketClientStub {
 }
 
 impl WebSocketClientStub {
-    pub fn new(config: crate::config::WebSocketConfig) -> NetworkResult<Self> {
+    /// Create new WebSocket client stub
+    ///
+    /// # Errors
+    ///
+    /// Returns `NetworkError` if configuration is invalid
+    pub const fn new(config: crate::config::WebSocketConfig) -> NetworkResult<Self> {
         Ok(Self { _config: config })
     }
 
+    #[must_use]
     pub fn stats(&self) -> crate::websocket::WebSocketClientStats {
         crate::websocket::WebSocketClientStats::default()
     }
 
-    pub fn is_healthy(&self) -> bool {
+    #[must_use]
+    pub const fn is_healthy(&self) -> bool {
         true
     }
 }
@@ -444,9 +459,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_network_manager_lifecycle() {
+    async fn test_network_manager_lifecycle() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let config = create_test_config();
-        let mut manager = NetworkManager::new(config).await.unwrap();
+        let mut manager = NetworkManager::new(config).await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         
         assert!(!manager.is_running());
         
@@ -457,26 +472,29 @@ mod tests {
         let result = manager.stop().await;
         assert!(result.is_ok());
         assert!(!manager.is_running());
+        Ok(())
     }
 
     #[test]
-    fn test_network_stats() {
+    fn test_network_stats() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let config = create_test_config();
-        let manager = futures::executor::block_on(NetworkManager::new(config)).unwrap();
+        let manager = futures::executor::block_on(NetworkManager::new(config)).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         
         let stats = manager.network_stats();
         assert_eq!(stats.http.total_requests, 0);
         assert_eq!(stats.websocket.active_connections, 0);
         assert_eq!(stats.load_balancer.total_endpoints, 1);
+        Ok(())
     }
 
     #[test]
-    fn test_health_check() {
+    fn test_health_check() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let config = create_test_config();
-        let manager = futures::executor::block_on(NetworkManager::new(config)).unwrap();
-        
-        let health = manager.health_check().unwrap();
+        let manager = futures::executor::block_on(NetworkManager::new(config)).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+
+        let health = manager.health_check().map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         assert_eq!(health.component, "network_manager");
         assert!(matches!(health.status, HealthLevel::Healthy));
+        Ok(())
     }
 }

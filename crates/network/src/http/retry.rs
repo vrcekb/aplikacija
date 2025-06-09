@@ -46,6 +46,7 @@ impl Default for RetryPolicy {
 
 impl RetryPolicy {
     /// Create exponential backoff retry policy
+    #[must_use]
     pub fn exponential(max_attempts: u32, initial_delay: Duration) -> Self {
         Self {
             max_attempts,
@@ -57,6 +58,7 @@ impl RetryPolicy {
     }
 
     /// Create linear backoff retry policy
+    #[must_use]
     pub fn linear(max_attempts: u32, delay: Duration) -> Self {
         Self {
             max_attempts,
@@ -68,6 +70,7 @@ impl RetryPolicy {
     }
 
     /// Create fixed delay retry policy
+    #[must_use]
     pub fn fixed(max_attempts: u32, delay: Duration) -> Self {
         Self {
             max_attempts,
@@ -80,6 +83,7 @@ impl RetryPolicy {
     }
 
     /// Create no-retry policy
+    #[must_use]
     pub fn none() -> Self {
         Self {
             max_attempts: 1,
@@ -88,6 +92,7 @@ impl RetryPolicy {
     }
 
     /// Check if error should trigger a retry
+    #[must_use]
     pub fn should_retry(&self, error: &NetworkError, attempt: u32) -> bool {
         if attempt >= self.max_attempts {
             return false;
@@ -97,45 +102,81 @@ impl RetryPolicy {
             NetworkError::Http { status_code, .. } => {
                 self.retry_on_status_codes.contains(status_code)
             }
-            NetworkError::Connection { .. } => self.retry_on_network_errors,
+            NetworkError::Critical(_) | NetworkError::CircuitBreaker { .. } => false, // Never retry critical errors or circuit breaker
             NetworkError::Timeout { .. } => self.retry_on_timeout,
-            NetworkError::Critical(_) => false, // Never retry critical errors
-            NetworkError::CircuitBreaker { .. } => false, // Circuit breaker handles its own logic
             _ => self.retry_on_network_errors,
         }
     }
 
     /// Calculate delay for next retry attempt
+    #[must_use]
     pub fn calculate_delay(&self, attempt: u32) -> Duration {
         if attempt == 0 {
             return Duration::ZERO;
         }
 
-        let base_delay = if self.backoff_multiplier == 1.0_f64 {
+        let base_delay = if (self.backoff_multiplier - 1.0_f64).abs() < f64::EPSILON {
             // Linear or fixed backoff
             self.initial_delay
         } else {
             // Exponential backoff
-            let multiplier = self.backoff_multiplier.powi(i32::try_from(attempt - 1).unwrap_or(0));
-            Duration::from_nanos(
-                (self.initial_delay.as_nanos() as f64 * multiplier) as u64
-            )
+            let multiplier = self.backoff_multiplier.powi(i32::try_from(attempt - 1).unwrap_or(0_i32));
+            let base_nanos = u64::try_from(self.initial_delay.as_nanos()).unwrap_or(u64::MAX);
+            let nanos = if multiplier <= 1.0_f64 {
+                base_nanos
+            } else {
+                // Use safe arithmetic to avoid precision loss
+                let max_safe_u64 = 2_u64.pow(52); // f64 mantissa precision limit
+                if base_nanos > max_safe_u64 {
+                    u64::MAX // Avoid precision loss for very large values
+                } else {
+                    #[allow(clippy::cast_precision_loss)] // Checked above
+                    let result = (base_nanos as f64 * multiplier).round();
+                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)] // Bounds checked
+                    if result >= u64::MAX as f64 {
+                        u64::MAX
+                    } else if result < 0.0_f64 {
+                        0_u64
+                    } else {
+                        result as u64
+                    }
+                }
+            };
+            Duration::from_nanos(nanos)
         };
 
         let delay = base_delay.min(self.max_delay);
 
         if self.enable_jitter {
-            self.add_jitter(delay)
+            Self::add_jitter(delay)
         } else {
             delay
         }
     }
 
     /// Add jitter to delay to avoid thundering herd
-    fn add_jitter(&self, delay: Duration) -> Duration {
+    fn add_jitter(delay: Duration) -> Duration {
         let mut rng = rand::thread_rng();
         let jitter_factor = rng.gen_range(0.5_f64..1.5_f64);
-        Duration::from_nanos((delay.as_nanos() as f64 * jitter_factor) as u64)
+        let base_nanos = u64::try_from(delay.as_nanos()).unwrap_or(u64::MAX);
+
+        // Use safe arithmetic to avoid precision loss
+        let max_safe_u64 = 2_u64.pow(52); // f64 mantissa precision limit
+        let nanos = if base_nanos > max_safe_u64 {
+            u64::MAX // Avoid precision loss for very large values
+        } else {
+            #[allow(clippy::cast_precision_loss)] // Checked above
+            let result = (base_nanos as f64 * jitter_factor).round();
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)] // Bounds checked
+            if result >= u64::MAX as f64 {
+                u64::MAX
+            } else if result < 0.0_f64 {
+                0_u64
+            } else {
+                result as u64
+            }
+        };
+        Duration::from_nanos(nanos)
     }
 }
 
@@ -156,6 +197,7 @@ pub struct RetryState {
 
 impl RetryState {
     /// Create new retry state
+    #[must_use]
     pub fn new(policy: RetryPolicy) -> Self {
         Self {
             attempt: 0,
@@ -167,12 +209,13 @@ impl RetryState {
     }
 
     /// Check if more retries are allowed
-    pub fn can_retry(&self) -> bool {
+    #[must_use]
+    pub const fn can_retry(&self) -> bool {
         self.attempt < self.policy.max_attempts
     }
 
     /// Record an error and determine if retry should be attempted
-    pub fn record_error(&mut self, error: NetworkError) -> bool {
+    pub fn record_error(&mut self, error: &NetworkError) -> bool {
         self.last_error = Some(error.clone());
         self.elapsed = self.start_time.elapsed();
 
@@ -180,27 +223,30 @@ impl RetryState {
             return false;
         }
 
-        self.policy.should_retry(&error, self.attempt)
+        self.policy.should_retry(error, self.attempt)
     }
 
     /// Get delay for next retry attempt
+    #[must_use]
     pub fn next_delay(&mut self) -> Duration {
         self.attempt += 1;
         self.policy.calculate_delay(self.attempt)
     }
 
     /// Check if retry sequence has timed out
+    #[must_use]
     pub fn is_timed_out(&self, max_total_time: Duration) -> bool {
         self.elapsed >= max_total_time
     }
 
     /// Get retry statistics
+    #[must_use]
     pub fn stats(&self) -> RetryStats {
         RetryStats {
             total_attempts: self.attempt,
             total_elapsed: self.elapsed,
             success: self.last_error.is_none(),
-            last_error: self.last_error.as_ref().map(|e| e.to_string()),
+            last_error: self.last_error.as_ref().map(std::string::ToString::to_string),
         }
     }
 }
@@ -235,6 +281,7 @@ where
     Fut: std::future::Future<Output = NetworkResult<T>>,
 {
     /// Create new retry executor
+    #[must_use]
     pub fn new(operation: F, policy: RetryPolicy) -> Self {
         Self {
             operation,
@@ -245,12 +292,16 @@ where
 
     /// Set maximum total time for all retry attempts
     #[must_use]
-    pub fn with_max_total_time(mut self, max_time: Duration) -> Self {
+    pub const fn with_max_total_time(mut self, max_time: Duration) -> Self {
         self.max_total_time = Some(max_time);
         self
     }
 
     /// Execute operation with retry logic
+    ///
+    /// # Errors
+    ///
+    /// Returns `NetworkError` if all retry attempts fail or timeout is exceeded
     pub async fn execute(mut self) -> NetworkResult<T> {
         loop {
             // Check total timeout
@@ -269,7 +320,7 @@ where
                 Ok(result) => return Ok(result),
                 Err(error) => {
                     // Check if we should retry
-                    if !self.state.record_error(error.clone()) {
+                    if !self.state.record_error(&error) {
                         return Err(NetworkError::RetryExhausted {
                             attempts: self.state.attempt,
                             operation: "http_request".to_string(),
@@ -288,12 +339,17 @@ where
     }
 
     /// Get current retry statistics
+    #[must_use]
     pub fn stats(&self) -> RetryStats {
         self.state.stats()
     }
 }
 
 /// Convenience function to execute operation with retry
+///
+/// # Errors
+///
+/// Returns `NetworkError` if all retry attempts fail
 pub async fn retry_async<F, Fut, T>(
     operation: F,
     policy: RetryPolicy,
@@ -316,11 +372,11 @@ mod tests {
         let policy = RetryPolicy::exponential(5, Duration::from_millis(100));
         assert_eq!(policy.max_attempts, 5);
         assert_eq!(policy.initial_delay, Duration::from_millis(100));
-        assert_eq!(policy.backoff_multiplier, 2.0_f64);
+        assert!((policy.backoff_multiplier - 2.0_f64).abs() < f64::EPSILON);
 
         let policy = RetryPolicy::linear(3, Duration::from_millis(500));
         assert_eq!(policy.max_attempts, 3);
-        assert_eq!(policy.backoff_multiplier, 1.0_f64);
+        assert!((policy.backoff_multiplier - 1.0_f64).abs() < f64::EPSILON);
 
         let policy = RetryPolicy::none();
         assert_eq!(policy.max_attempts, 1);
@@ -362,7 +418,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_retry_executor() {
+    async fn test_retry_executor() -> Result<(), Box<dyn std::error::Error>> {
         let counter = Arc::new(AtomicU32::new(0));
         let counter_clone = counter.clone();
 
@@ -382,12 +438,13 @@ mod tests {
         let result = RetryExecutor::new(operation, policy).execute().await;
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "Success");
+        assert_eq!(result.map_err(|e| format!("Test failed: {e}"))?, "Success");
         assert_eq!(counter.load(Ordering::SeqCst), 3); // Failed twice, succeeded on third
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_retry_exhausted() {
+    async fn test_retry_exhausted() -> Result<(), Box<dyn std::error::Error>> {
         let operation = || async {
             Err::<String, _>(NetworkError::http(500, "Server Error", None))
         };
@@ -399,7 +456,8 @@ mod tests {
         if let Err(NetworkError::RetryExhausted { attempts, .. }) = result {
             assert_eq!(attempts, 2);
         } else {
-            panic!("Expected RetryExhausted error");
+            return Err("Expected RetryExhausted error".into());
         }
+        Ok(())
     }
 }

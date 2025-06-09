@@ -3,7 +3,7 @@
 //! Comprehensive metrics collection for network operations.
 //! Provides detailed insights into performance, reliability, and resource utilization.
 
-use crate::error::NetworkResult;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -28,6 +28,7 @@ pub struct NetworkMetrics {
 
 impl NetworkMetrics {
     /// Create new metrics collector
+    #[must_use]
     pub fn new() -> Self {
         Self {
             http_metrics: Arc::new(HttpMetrics::new()),
@@ -40,31 +41,37 @@ impl NetworkMetrics {
     }
 
     /// Get HTTP metrics
+    #[must_use]
     pub fn http(&self) -> &HttpMetrics {
         &self.http_metrics
     }
 
     /// Get WebSocket metrics
+    #[must_use]
     pub fn websocket(&self) -> &WebSocketMetrics {
         &self.websocket_metrics
     }
 
     /// Get connection metrics
+    #[must_use]
     pub fn connection(&self) -> &ConnectionMetrics {
         &self.connection_metrics
     }
 
     /// Get performance metrics
+    #[must_use]
     pub fn performance(&self) -> &PerformanceMetrics {
         &self.performance_metrics
     }
 
     /// Get error metrics
+    #[must_use]
     pub fn error(&self) -> &ErrorMetrics {
         &self.error_metrics
     }
 
     /// Get comprehensive metrics snapshot
+    #[must_use]
     pub fn snapshot(&self) -> NetworkMetricsSnapshot {
         NetworkMetricsSnapshot {
             timestamp: SystemTime::now(),
@@ -112,7 +119,7 @@ pub struct HttpMetrics {
 }
 
 impl HttpMetrics {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             total_requests: AtomicU64::new(0),
             successful_responses: AtomicU64::new(0),
@@ -139,8 +146,8 @@ impl HttpMetrics {
         }
 
         // Record latency
-        if let Ok(mut histogram) = self.latency_histogram.try_lock() {
-            histogram.push(latency.as_micros() as u64);
+        if let Some(mut histogram) = self.latency_histogram.try_lock() {
+            histogram.push(u64::try_from(latency.as_micros()).unwrap_or(u64::MAX));
             // Keep only last 1000 samples
             if histogram.len() > 1000 {
                 histogram.remove(0);
@@ -196,7 +203,7 @@ pub struct WebSocketMetrics {
 }
 
 impl WebSocketMetrics {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             active_connections: AtomicU64::new(0),
             connection_attempts: AtomicU64::new(0),
@@ -281,7 +288,7 @@ pub struct ConnectionMetrics {
 }
 
 impl ConnectionMetrics {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             active_connections: AtomicU64::new(0),
             pool_utilization: parking_lot::Mutex::new(0.0_f64),
@@ -334,7 +341,7 @@ pub struct PerformanceMetrics {
 }
 
 impl PerformanceMetrics {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             cpu_usage: parking_lot::Mutex::new(0.0_f64),
             memory_usage: AtomicU64::new(0),
@@ -420,8 +427,47 @@ fn calculate_latency_percentiles(latencies: &[u64]) -> (u64, u64, u64) {
     sorted.sort_unstable();
 
     let avg = sorted.iter().sum::<u64>() / sorted.len() as u64;
-    let p95_index = (sorted.len() as f64 * 0.95_f64) as usize;
-    let p99_index = (sorted.len() as f64 * 0.99_f64) as usize;
+    // Use safe arithmetic to avoid precision loss
+    let len = sorted.len();
+    let p95_index = if len == 0 {
+        0_usize
+    } else {
+        let max_safe_usize = 2_usize.pow(52); // f64 mantissa precision limit
+        if len > max_safe_usize {
+            (len * 95) / 100 // Use integer arithmetic for very large values
+        } else {
+            #[allow(clippy::cast_precision_loss)] // Checked above
+            let result = (len as f64 * 0.95_f64).round();
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)] // Bounds checked
+            if result >= usize::MAX as f64 {
+                usize::MAX
+            } else if result < 0.0_f64 {
+                0_usize
+            } else {
+                result as usize
+            }
+        }
+    };
+
+    let p99_index = if len == 0 {
+        0_usize
+    } else {
+        let max_safe_usize = 2_usize.pow(52); // f64 mantissa precision limit
+        if len > max_safe_usize {
+            (len * 99) / 100 // Use integer arithmetic for very large values
+        } else {
+            #[allow(clippy::cast_precision_loss)] // Checked above
+            let result = (len as f64 * 0.99_f64).round();
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)] // Bounds checked
+            if result >= usize::MAX as f64 {
+                usize::MAX
+            } else if result < 0.0_f64 {
+                0_usize
+            } else {
+                result as usize
+            }
+        }
+    };
 
     let p95 = sorted.get(p95_index.saturating_sub(1)).copied().unwrap_or(0);
     let p99 = sorted.get(p99_index.saturating_sub(1)).copied().unwrap_or(0);

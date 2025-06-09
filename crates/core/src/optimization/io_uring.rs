@@ -480,7 +480,7 @@ mod tests {
             let slice = buffer.as_mut_slice();
             if let Some(first) = slice.get_mut(0) {
                 *first = 42;
-                if let Some(&value) = slice.get(0) {
+                if let Some(&value) = slice.first() {
                     assert_eq!(value, 42);
                 }
             }

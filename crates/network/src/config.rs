@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 /// Network configuration for `TallyIO`
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Validate)]
 pub struct NetworkConfig {
     /// HTTP client configuration
     #[garde(dive)]
@@ -269,7 +269,7 @@ pub struct ReconnectConfig {
     pub initial_delay_ms: u64,
 
     /// Maximum reconnection delay (milliseconds)
-    #[garde(range(min = 1000, max = 300000))]
+    #[garde(range(min = 1000, max = 300_000))]
     pub max_delay_ms: u64,
 
     /// Backoff multiplier
@@ -278,7 +278,7 @@ pub struct ReconnectConfig {
 }
 
 /// Health check configuration
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, Validate)]
 pub struct HealthCheckConfig {
     /// Health check interval (seconds)
     #[garde(range(min = 1, max = 300))]
@@ -373,18 +373,7 @@ impl Default for TlsVersion {
     }
 }
 
-impl Default for NetworkConfig {
-    fn default() -> Self {
-        Self {
-            http: HttpConfig::default(),
-            websocket: WebSocketConfig::default(),
-            load_balancer: LoadBalancerConfig::default(),
-            p2p: None,
-            security: SecurityConfig::default(),
-            metrics: MetricsConfig::default(),
-        }
-    }
-}
+
 
 impl Default for HttpConfig {
     fn default() -> Self {
@@ -548,7 +537,8 @@ impl NetworkConfig {
     }
 
     /// Get timeout durations
-    pub fn timeouts(&self) -> NetworkTimeouts {
+    #[must_use]
+    pub const fn timeouts(&self) -> NetworkTimeouts {
         NetworkTimeouts {
             connection: Duration::from_secs(self.http.connection_timeout_s),
             request: Duration::from_secs(self.http.request_timeout_s),

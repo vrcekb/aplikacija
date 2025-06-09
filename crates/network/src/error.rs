@@ -399,6 +399,31 @@ impl From<LoadBalancerError> for NetworkError {
     }
 }
 
+// Convert from external crate errors
+impl From<serde_json::Error> for NetworkError {
+    fn from(err: serde_json::Error) -> Self {
+        Self::Json {
+            message: err.to_string(),
+        }
+    }
+}
+
+impl From<url::ParseError> for NetworkError {
+    fn from(err: url::ParseError) -> Self {
+        Self::UrlParse {
+            message: err.to_string(),
+        }
+    }
+}
+
+impl From<std::io::Error> for NetworkError {
+    fn from(err: std::io::Error) -> Self {
+        Self::Io {
+            message: err.to_string(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
