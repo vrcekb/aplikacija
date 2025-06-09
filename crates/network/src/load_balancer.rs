@@ -62,6 +62,7 @@ impl Default for LoadBalancerStats {
 }
 
 /// Load balancer implementation
+#[derive(Clone)]
 pub struct LoadBalancer {
     strategy: LoadBalancingStrategy,
     endpoints: Arc<std::sync::RwLock<Vec<Endpoint>>>,
