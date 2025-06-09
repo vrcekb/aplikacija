@@ -136,16 +136,16 @@ pub const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
 /// Build information
 pub mod build_info {
     /// Build timestamp
-    pub const BUILD_TIMESTAMP: &str = env!("VERGEN_BUILD_TIMESTAMP");
-    
+    pub const BUILD_TIMESTAMP: &str = option_env!("VERGEN_BUILD_TIMESTAMP").unwrap_or("unknown");
+
     /// Git commit hash
-    pub const GIT_SHA: &str = env!("VERGEN_GIT_SHA");
-    
+    pub const GIT_SHA: &str = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
+
     /// Rust version used for build
-    pub const RUSTC_VERSION: &str = env!("VERGEN_RUSTC_SEMVER");
-    
+    pub const RUSTC_VERSION: &str = option_env!("VERGEN_RUSTC_SEMVER").unwrap_or("unknown");
+
     /// Target triple
-    pub const TARGET_TRIPLE: &str = env!("VERGEN_CARGO_TARGET_TRIPLE");
+    pub const TARGET_TRIPLE: &str = option_env!("VERGEN_CARGO_TARGET_TRIPLE").unwrap_or("unknown");
 }
 
 /// Network capabilities and feature flags

@@ -5,8 +5,7 @@
 
 use crate::error::{CoreError, CoreResult};
 use std::fs;
-use std::io::{self, BufRead, BufReader, Write};
-use std::process::Command;
+use std::io;
 
 /// Realtime configuration for Linux systems
 #[derive(Debug, Clone)]
@@ -19,7 +18,7 @@ pub struct RealtimeConfig {
     pub hugepage_size: HugepageSize,
     /// Number of hugepages to allocate
     pub hugepage_count: u32,
-    /// Enable PREEMPT_RT kernel features
+    /// Enable `PREEMPT_RT` kernel features
     pub enable_preempt_rt: bool,
     /// Enable CPU frequency scaling governor
     pub cpu_governor: CpuGovernor,
@@ -104,18 +103,18 @@ impl RealtimeOptimizer {
     pub fn apply_optimizations(&self) -> CoreResult<()> {
         // Check if running on Linux
         if !cfg!(target_os = "linux") {
-            return Err(CoreError::InvalidConfiguration(
-                "Realtime optimizations are only available on Linux".to_string(),
+            return Err(CoreError::invalid_configuration(
+                "Realtime optimizations are only available on Linux"
             ));
         }
 
         // Apply optimizations in order of importance
         self.setup_cpu_isolation()?;
-        self.setup_hugepages()?;
-        self.setup_cpu_governor()?;
+        self.setup_hugepages();
+        self.setup_cpu_governor();
         self.setup_interrupt_affinity()?;
         self.check_preempt_rt()?;
-        self.apply_sysctl_tuning()?;
+        Self::apply_sysctl_tuning();
 
         Ok(())
     }
@@ -128,7 +127,7 @@ impl RealtimeOptimizer {
 
         // Check current kernel command line
         let cmdline = fs::read_to_string("/proc/cmdline")
-            .map_err(|e| CoreError::SystemError(format!("Failed to read /proc/cmdline: {e}")))?;
+            .map_err(|e| CoreError::system_error(format!("Failed to read /proc/cmdline: {e}")))?;
 
         let cores_str = self
             .config
@@ -140,8 +139,7 @@ impl RealtimeOptimizer {
 
         if !cmdline.contains(&format!("isolcpus={cores_str}")) {
             eprintln!(
-                "WARNING: CPU isolation not configured. Add 'isolcpus={} nohz_full={} rcu_nocbs={}' to kernel boot parameters",
-                cores_str, cores_str, cores_str
+                "WARNING: CPU isolation not configured. Add 'isolcpus={cores_str} nohz_full={cores_str} rcu_nocbs={cores_str}' to kernel boot parameters"
             );
         }
 
@@ -157,7 +155,6 @@ impl RealtimeOptimizer {
         {
             use libc::{cpu_set_t, sched_setaffinity, CPU_SET, CPU_ZERO};
             use std::mem;
-            use std::os::unix::process::CommandExt;
 
             unsafe {
                 let mut cpu_set: cpu_set_t = mem::zeroed();
@@ -169,8 +166,8 @@ impl RealtimeOptimizer {
                 }
 
                 let result = sched_setaffinity(0, mem::size_of::<cpu_set_t>(), &cpu_set);
-                if result != 0 {
-                    return Err(CoreError::SystemError(format!(
+                if result != 0_i32 {
+                    return Err(CoreError::system_error(format!(
                         "Failed to set CPU affinity: {}",
                         io::Error::last_os_error()
                     )));
@@ -182,9 +179,9 @@ impl RealtimeOptimizer {
     }
 
     /// Setup hugepages
-    fn setup_hugepages(&self) -> CoreResult<()> {
+    fn setup_hugepages(&self) {
         if !self.config.enable_hugepages {
-            return Ok(());
+            return;
         }
 
         let hugepage_path = match self.config.hugepage_size {
@@ -213,17 +210,15 @@ impl RealtimeOptimizer {
             }
         }
 
-        Ok(())
     }
 
     /// Setup CPU frequency scaling governor
-    fn setup_cpu_governor(&self) -> CoreResult<()> {
+    fn setup_cpu_governor(&self) {
         let governor = self.config.cpu_governor.name();
 
         for &core in &self.config.isolated_cores {
             let governor_path = format!(
-                "/sys/devices/system/cpu/cpu{}/cpufreq/scaling_governor",
-                core
+                "/sys/devices/system/cpu/cpu{core}/cpufreq/scaling_governor"
             );
 
             if let Err(e) = fs::write(&governor_path, governor) {
@@ -240,10 +235,13 @@ impl RealtimeOptimizer {
             let _ = fs::write("/sys/devices/system/cpu/cpu0/power/energy_perf_bias", "0");
         }
 
-        Ok(())
     }
 
     /// Setup interrupt affinity
+    ///
+    /// # Errors
+    ///
+    /// Returns error if interrupt affinity cannot be configured
     fn setup_interrupt_affinity(&self) -> CoreResult<()> {
         if !self.config.enable_irq_affinity || self.config.network_irq_cpus.is_empty() {
             return Ok(());
@@ -251,7 +249,7 @@ impl RealtimeOptimizer {
 
         // Find network device interrupts
         let irq_dir = fs::read_dir("/proc/irq")
-            .map_err(|e| CoreError::SystemError(format!("Failed to read /proc/irq: {e}")))?;
+            .map_err(|e| CoreError::system_error(format!("Failed to read /proc/irq: {e}")))?;
 
         let cpu_mask = self
             .config
@@ -276,14 +274,18 @@ impl RealtimeOptimizer {
         Ok(())
     }
 
-    /// Check for PREEMPT_RT kernel
+    /// Check for `PREEMPT_RT` kernel
+    ///
+    /// # Errors
+    ///
+    /// Returns error if kernel version cannot be read or parsed
     fn check_preempt_rt(&self) -> CoreResult<()> {
         if !self.config.enable_preempt_rt {
             return Ok(());
         }
 
         let version = fs::read_to_string("/proc/version")
-            .map_err(|e| CoreError::SystemError(format!("Failed to read /proc/version: {e}")))?;
+            .map_err(|e| CoreError::system_error(format!("Failed to read /proc/version: {e}")))?;
 
         if !version.contains("PREEMPT_RT") && !version.contains("PREEMPT RT") {
             eprintln!("WARNING: PREEMPT_RT kernel not detected. Install linux-rt for best latency");
@@ -293,7 +295,7 @@ impl RealtimeOptimizer {
     }
 
     /// Apply sysctl tuning for low latency
-    fn apply_sysctl_tuning(&self) -> CoreResult<()> {
+    fn apply_sysctl_tuning() {
         let tuning_params = vec![
             // Disable kernel preemption latency tracing
             ("kernel.sched_latency_ns", "1000000"),
@@ -320,10 +322,13 @@ impl RealtimeOptimizer {
             }
         }
 
-        Ok(())
     }
 
     /// Get current system latency statistics
+    ///
+    /// # Errors
+    ///
+    /// Returns error if system files cannot be read or parsed
     pub fn get_latency_stats(&self) -> CoreResult<LatencyStats> {
         let mut stats = LatencyStats::default();
 
@@ -355,7 +360,7 @@ impl RealtimeOptimizer {
 
         // Check CPU idle states
         for &cpu in &self.config.isolated_cores {
-            let idle_path = format!("/sys/devices/system/cpu/cpu{}/cpuidle/state0/time", cpu);
+            let idle_path = format!("/sys/devices/system/cpu/cpu{cpu}/cpuidle/state0/time");
             if let Ok(idle_time) = fs::read_to_string(idle_path) {
                 if let Ok(time) = idle_time.trim().parse::<u64>() {
                     stats.cpu_idle_time_us += time;

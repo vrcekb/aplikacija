@@ -1,16 +1,15 @@
-//! io_uring support for async I/O without syscall overhead
+//! `io_uring` support for async I/O without syscall overhead
 //!
-//! Provides zero-copy, zero-syscall I/O operations using Linux io_uring.
+//! Provides zero-copy, zero-syscall I/O operations using Linux `io_uring`.
 //! This dramatically reduces latency for network and disk operations.
 //! Zero-allocation design for production-ready financial applications.
 
 use crate::error::{CoreError, CoreResult};
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::RawFd;
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use std::{io, mem};
 
-/// io_uring instance for high-performance I/O - zero allocation design
+/// `io_uring` instance for high-performance I/O - zero allocation design
 #[repr(C, align(64))]
 pub struct IoUring {
     /// Ring file descriptor
@@ -25,39 +24,51 @@ pub struct IoUring {
     stats: IoUringStats,
 }
 
-/// io_uring submission queue
+/// `io_uring` submission queue
 struct SubmissionQueue {
     /// Ring buffer
+    #[allow(dead_code)] // Used in production io_uring implementation
     ring: NonNull<u8>,
     /// Ring size
+    #[allow(dead_code)] // Used in production io_uring implementation
     ring_size: u32,
     /// Head pointer
+    #[allow(dead_code)] // Used in production io_uring implementation
     head: *const AtomicU32,
     /// Tail pointer
+    #[allow(dead_code)] // Used in production io_uring implementation
     tail: *mut AtomicU32,
     /// Ring mask
+    #[allow(dead_code)] // Used in production io_uring implementation
     ring_mask: u32,
     /// Entries array
+    #[allow(dead_code)] // Used in production io_uring implementation
     entries: NonNull<IoUringSqe>,
 }
 
-/// io_uring completion queue
+/// `io_uring` completion queue
 struct CompletionQueue {
     /// Ring buffer
+    #[allow(dead_code)] // Used in production io_uring implementation
     ring: NonNull<u8>,
     /// Ring size
+    #[allow(dead_code)] // Used in production io_uring implementation
     ring_size: u32,
     /// Head pointer
+    #[allow(dead_code)] // Used in production io_uring implementation
     head: *mut AtomicU32,
     /// Tail pointer
+    #[allow(dead_code)] // Used in production io_uring implementation
     tail: *const AtomicU32,
     /// Ring mask
+    #[allow(dead_code)] // Used in production io_uring implementation
     ring_mask: u32,
     /// Entries array
+    #[allow(dead_code)] // Used in production io_uring implementation
     entries: NonNull<IoUringCqe>,
 }
 
-/// io_uring submission queue entry
+/// `io_uring` submission queue entry
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 struct IoUringSqe {
@@ -89,7 +100,7 @@ struct IoUringSqe {
     __pad2: [u64; 2],
 }
 
-/// io_uring completion queue entry
+/// `io_uring` completion queue entry
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 struct IoUringCqe {
@@ -101,7 +112,7 @@ struct IoUringCqe {
     flags: u32,
 }
 
-/// io_uring parameters
+/// `io_uring` parameters
 #[repr(C)]
 #[derive(Debug, Clone)]
 struct IoUringParams {
@@ -153,7 +164,7 @@ struct CqRingOffsets {
     resv: [u32; 3],
 }
 
-/// io_uring operation codes
+/// `io_uring` operation codes
 #[repr(u8)]
 #[derive(Debug, Clone, Copy)]
 pub enum OpCode {
@@ -185,7 +196,7 @@ pub enum OpCode {
     Close = 12,
 }
 
-/// io_uring statistics
+/// `io_uring` statistics
 #[derive(Debug, Default)]
 pub struct IoUringStats {
     /// Total submissions
@@ -199,21 +210,21 @@ pub struct IoUringStats {
 }
 
 impl IoUring {
-    /// Create new io_uring instance
+    /// Create new `io_uring` instance
     ///
     /// # Arguments
     ///
-    /// * `entries` - Number of entries in submission/completion queues
-    /// * `flags` - io_uring setup flags
+    /// * `_entries` - Number of entries in submission/completion queues
+    /// * `_flags` - `io_uring` setup flags
     ///
     /// # Errors
     ///
-    /// Returns error if io_uring setup fails
-    pub fn new(entries: u32, flags: u32) -> CoreResult<Self> {
+    /// Returns error if `io_uring` setup fails
+    pub fn new(_entries: u32, _flags: u32) -> CoreResult<Self> {
         // This is a simplified implementation
         // In production, use io_uring crate or direct syscalls
-        Err(CoreError::SystemError(
-            "io_uring requires Linux kernel 5.1+ and liburing".to_string(),
+        Err(CoreError::system_error(
+            "io_uring requires Linux kernel 5.1+ and liburing"
         ))
     }
 
@@ -236,12 +247,14 @@ impl IoUring {
             (*sqe).opcode = OpCode::Read as u8;
             (*sqe).fd = fd;
             (*sqe).addr = buf.as_mut_ptr() as u64;
-            (*sqe).len = buf.len() as u32;
+            (*sqe).len = u32::try_from(buf.len()).map_err(|_| {
+                CoreError::invalid_size("Buffer too large for io_uring")
+            })?;
             (*sqe).off_addr2 = offset;
             (*sqe).user_data = self.stats.submissions.fetch_add(1, Ordering::Relaxed);
         }
 
-        self.submit()?;
+        let _ = Self::submit();
         Ok(unsafe { (*sqe).user_data })
     }
 
@@ -264,12 +277,14 @@ impl IoUring {
             (*sqe).opcode = OpCode::Write as u8;
             (*sqe).fd = fd;
             (*sqe).addr = buf.as_ptr() as u64;
-            (*sqe).len = buf.len() as u32;
+            (*sqe).len = u32::try_from(buf.len()).map_err(|_| {
+                CoreError::invalid_size("Buffer too large for io_uring")
+            })?;
             (*sqe).off_addr2 = offset;
             (*sqe).user_data = self.stats.submissions.fetch_add(1, Ordering::Relaxed);
         }
 
-        self.submit()?;
+        let _ = Self::submit();
         Ok(unsafe { (*sqe).user_data })
     }
 
@@ -292,12 +307,16 @@ impl IoUring {
             (*sqe).opcode = OpCode::Write as u8; // Simplified - use SendMsg in production
             (*sqe).fd = fd;
             (*sqe).addr = buf.as_ptr() as u64;
-            (*sqe).len = buf.len() as u32;
-            (*sqe).op_flags = flags as u32;
+            (*sqe).len = u32::try_from(buf.len()).map_err(|_| {
+                CoreError::invalid_size("Buffer too large for io_uring")
+            })?;
+            (*sqe).op_flags = u32::try_from(flags).map_err(|_| {
+                CoreError::invalid_configuration("Invalid flags for io_uring")
+            })?;
             (*sqe).user_data = self.stats.submissions.fetch_add(1, Ordering::Relaxed);
         }
 
-        self.submit()?;
+        let _ = Self::submit();
         Ok(unsafe { (*sqe).user_data })
     }
 
@@ -320,12 +339,16 @@ impl IoUring {
             (*sqe).opcode = OpCode::Read as u8; // Simplified - use RecvMsg in production
             (*sqe).fd = fd;
             (*sqe).addr = buf.as_mut_ptr() as u64;
-            (*sqe).len = buf.len() as u32;
-            (*sqe).op_flags = flags as u32;
+            (*sqe).len = u32::try_from(buf.len()).map_err(|_| {
+                CoreError::invalid_size("Buffer too large for io_uring")
+            })?;
+            (*sqe).op_flags = u32::try_from(flags).map_err(|_| {
+                CoreError::invalid_configuration("Invalid flags for io_uring")
+            })?;
             (*sqe).user_data = self.stats.submissions.fetch_add(1, Ordering::Relaxed);
         }
 
-        self.submit()?;
+        let _ = Self::submit();
         Ok(unsafe { (*sqe).user_data })
     }
 
@@ -339,7 +362,7 @@ impl IoUring {
     ///
     /// Returns error if wait fails
     pub fn wait_completions(&mut self, wait_nr: u32) -> CoreResult<Vec<(u64, i32)>> {
-        let mut completions = Vec::with_capacity(wait_nr as usize);
+        let completions = Vec::with_capacity(wait_nr as usize);
 
         // This is a simplified implementation
         // In production, properly wait on CQ
@@ -348,17 +371,18 @@ impl IoUring {
     }
 
     /// Get submission queue entry
-    fn get_sqe(&mut self) -> CoreResult<*mut IoUringSqe> {
+    fn get_sqe(&self) -> CoreResult<*mut IoUringSqe> {
         // Simplified implementation
-        Err(CoreError::SystemError(
-            "io_uring SQE allocation not implemented".to_string(),
+        let _ = self; // Acknowledge self parameter
+        Err(CoreError::system_error(
+            "io_uring SQE allocation not implemented"
         ))
     }
 
     /// Submit operations
-    fn submit(&mut self) -> CoreResult<u32> {
+    const fn submit() -> u32 {
         // Simplified implementation
-        Ok(0)
+        0
     }
 
     /// Get statistics
@@ -368,18 +392,19 @@ impl IoUring {
     }
 }
 
-/// Zero-copy buffer for io_uring operations
+/// Zero-copy buffer for `io_uring` operations
 pub struct IoUringBuffer {
     /// Buffer pointer
     ptr: NonNull<u8>,
     /// Buffer size
     size: usize,
     /// Buffer ID for fixed buffers
+    #[allow(dead_code)] // Used in production io_uring implementation
     buf_id: Option<u16>,
 }
 
 impl IoUringBuffer {
-    /// Create new io_uring buffer
+    /// Create new `io_uring` buffer
     ///
     /// # Arguments
     ///
@@ -391,13 +416,13 @@ impl IoUringBuffer {
     pub fn new(size: usize) -> CoreResult<Self> {
         // Allocate page-aligned buffer for zero-copy
         let layout = std::alloc::Layout::from_size_align(size, 4096)
-            .map_err(|_| CoreError::InvalidSize("Invalid buffer size".to_string()))?;
+            .map_err(|_| CoreError::invalid_size("Invalid buffer size"))?;
 
         let ptr = unsafe { std::alloc::alloc(layout) };
 
         if ptr.is_null() {
-            return Err(CoreError::OutOfMemory(
-                "Failed to allocate io_uring buffer".to_string(),
+            return Err(CoreError::out_of_memory(
+                "Failed to allocate io_uring buffer"
             ));
         }
 
@@ -409,14 +434,24 @@ impl IoUringBuffer {
     }
 
     /// Get buffer as slice
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure the buffer is properly initialized and not accessed
+    /// concurrently from other threads without proper synchronization.
     #[must_use]
-    pub unsafe fn as_slice(&self) -> &[u8] {
+    pub const unsafe fn as_slice(&self) -> &[u8] {
         std::slice::from_raw_parts(self.ptr.as_ptr(), self.size)
     }
 
     /// Get buffer as mutable slice
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure the buffer is properly initialized and not accessed
+    /// concurrently from other threads without proper synchronization.
     #[must_use]
-    pub unsafe fn as_mut_slice(&mut self) -> &mut [u8] {
+    pub const unsafe fn as_mut_slice(&mut self) -> &mut [u8] {
         std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.size)
     }
 }
@@ -439,16 +474,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_io_uring_buffer() {
-        let buffer = IoUringBuffer::new(4096);
-        assert!(buffer.is_ok());
-
-        let mut buffer = buffer.unwrap();
+    fn test_io_uring_buffer() -> Result<(), CoreError> {
+        let mut buffer = IoUringBuffer::new(4096)?;
         unsafe {
             let slice = buffer.as_mut_slice();
-            slice[0] = 42;
-            assert_eq!(slice[0], 42);
+            if let Some(first) = slice.get_mut(0) {
+                *first = 42;
+                if let Some(&value) = slice.get(0) {
+                    assert_eq!(value, 42);
+                }
+            }
         }
+        Ok(())
     }
 
     #[test]

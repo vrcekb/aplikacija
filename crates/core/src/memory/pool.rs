@@ -855,7 +855,7 @@ impl MemoryPool {
     /// Try NUMA-specific memory allocation
     fn try_numa_allocation(
         layout: Layout,
-        _numa_node: usize,
+        numa_node: usize,
     ) -> Result<NonNull<u8>, MemoryPoolError> {
         // On Linux, we could use numa_alloc_onnode, but for portability we use regular alloc
         // In production, this would use platform-specific NUMA APIs

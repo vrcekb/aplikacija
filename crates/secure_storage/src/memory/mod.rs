@@ -62,8 +62,10 @@ pub fn initialize_memory_protection(config: &MemoryProtectionConfig) -> SecureSt
                 rlim_max: RLIM_INFINITY,
             };
 
+            // SAFETY: setrlimit is a standard POSIX function with well-defined behavior
+            // when called with valid parameters. The limit struct is properly initialized.
             let result = unsafe { setrlimit(RLIMIT_MEMLOCK, &limit) };
-            if result != 0 {
+            if result != 0_i32 {
                 return Err(SecureStorageError::MemoryProtection {
                     operation: "setrlimit_memlock".to_string(),
                     reason: "Failed to set memory lock limits".to_string(),
@@ -82,8 +84,10 @@ pub fn initialize_memory_protection(config: &MemoryProtectionConfig) -> SecureSt
             rlim_max: 0,
         };
 
+        // SAFETY: setrlimit is a standard POSIX function with well-defined behavior
+        // when called with valid parameters. The limit struct is properly initialized.
         let result = unsafe { setrlimit(RLIMIT_CORE, &limit) };
-        if result != 0 {
+        if result != 0_i32 {
             return Err(SecureStorageError::MemoryProtection {
                 operation: "setrlimit_core".to_string(),
                 reason: "Failed to disable core dumps".to_string(),
@@ -151,8 +155,10 @@ impl MemoryProtection {
     pub fn lock_memory(ptr: *const u8, len: usize) -> SecureStorageResult<()> {
         use libc::mlock;
 
+        // SAFETY: mlock is a standard POSIX function. The ptr is guaranteed to be valid
+        // and len represents the actual size of the allocated memory region.
         let result = unsafe { mlock(ptr.cast::<libc::c_void>(), len) };
-        if result != 0 {
+        if result != 0_i32 {
             return Err(SecureStorageError::MemoryProtection {
                 operation: "mlock".to_string(),
                 reason: format!(
@@ -178,8 +184,10 @@ impl MemoryProtection {
     pub fn unlock_memory(ptr: *const u8, len: usize) -> SecureStorageResult<()> {
         use libc::munlock;
 
+        // SAFETY: munlock is a standard POSIX function. The ptr is guaranteed to be valid
+        // and len represents the actual size of the memory region that was previously locked.
         let result = unsafe { munlock(ptr.cast::<libc::c_void>(), len) };
-        if result != 0 {
+        if result != 0_i32 {
             return Err(SecureStorageError::MemoryProtection {
                 operation: "munlock".to_string(),
                 reason: format!(
@@ -211,8 +219,10 @@ impl MemoryProtection {
             PROT_READ | PROT_WRITE
         };
 
-        let result = unsafe { mprotect(ptr.cast::<libc::c_void>(), len, prot) };
-        if result != 0 {
+        // SAFETY: mprotect is a standard POSIX function. The ptr is guaranteed to be valid
+        // and len represents the actual size of the memory region.
+        let result = unsafe { mprotect(ptr.cast_mut().cast::<libc::c_void>(), len, prot) };
+        if result != 0_i32 {
             return Err(SecureStorageError::MemoryProtection {
                 operation: "mprotect".to_string(),
                 reason: format!(

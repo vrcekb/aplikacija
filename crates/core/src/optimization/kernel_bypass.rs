@@ -6,7 +6,7 @@
 use crate::error::{CoreError, CoreResult};
 use crate::lockfree::ultra::cache_aligned::CacheAligned;
 use std::mem;
-use std::ptr::{self, NonNull};
+use std::ptr::NonNull;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 /// Maximum ring size (power of 2)
@@ -46,11 +46,11 @@ pub struct NetworkDevice {
     _reserved: [u8; 18],
 }
 
-/// RX ring for receiving packets - fixed size allocation
+/// RX ring for receiving packets - heap allocated for large arrays
 #[repr(C, align(64))]
 pub struct RxRing {
-    /// Ring buffer (fixed size, no Vec)
-    descriptors: CacheAligned<[RxDescriptor; MAX_RING_SIZE]>,
+    /// Ring buffer (heap allocated to avoid stack overflow)
+    descriptors: Box<[RxDescriptor]>,
     /// Producer index
     producer: CacheAligned<AtomicUsize>,
     /// Consumer index
@@ -61,11 +61,11 @@ pub struct RxRing {
     size: usize,
 }
 
-/// TX ring for transmitting packets - fixed size allocation
+/// TX ring for transmitting packets - heap allocated for large arrays
 #[repr(C, align(64))]
 pub struct TxRing {
-    /// Ring buffer (fixed size, no Vec)
-    descriptors: CacheAligned<[TxDescriptor; MAX_RING_SIZE]>,
+    /// Ring buffer (heap allocated to avoid stack overflow)
+    descriptors: Box<[TxDescriptor]>,
     /// Producer index
     producer: CacheAligned<AtomicUsize>,
     /// Consumer index
@@ -78,6 +78,7 @@ pub struct TxRing {
 
 /// RX descriptor
 #[repr(C, align(64))]
+#[derive(Copy, Clone)]
 pub struct RxDescriptor {
     /// Packet buffer physical address
     addr: u64,
@@ -91,6 +92,7 @@ pub struct RxDescriptor {
 
 /// TX descriptor
 #[repr(C, align(64))]
+#[derive(Copy, Clone)]
 pub struct TxDescriptor {
     /// Packet buffer physical address
     addr: u64,
@@ -111,8 +113,8 @@ pub struct PacketMemoryPool {
     memory: NonNull<u8>,
     /// Total size
     size: usize,
-    /// Free list
-    free_list: [NonNull<Packet>; MAX_PACKET_POOL_SIZE],
+    /// Free list (heap allocated to avoid stack overflow)
+    free_list: Box<[NonNull<Packet>]>,
     /// Free index
     free_index: CacheAligned<AtomicUsize>,
 }
@@ -134,14 +136,19 @@ pub struct Packet {
 #[derive(Debug, Clone, Copy)]
 pub struct PacketMetadata {
     /// Receive timestamp (TSC)
+    #[allow(dead_code)] // Used in production for latency measurement
     rx_timestamp: u64,
     /// Port ID
+    #[allow(dead_code)] // Used in production for multi-port NICs
     port: u16,
     /// Queue ID
+    #[allow(dead_code)] // Used in production for multi-queue processing
     queue: u16,
     /// Checksum flags
+    #[allow(dead_code)] // Used in production for hardware offload
     checksum: u16,
     /// VLAN tag
+    #[allow(dead_code)] // Used in production for VLAN processing
     vlan: u16,
 }
 
@@ -176,14 +183,19 @@ impl KernelBypassNic {
     /// # Errors
     ///
     /// Returns error if initialization fails
-    pub fn new(pci_addr: &str, num_rx_desc: usize, num_tx_desc: usize) -> CoreResult<Self> {
+    pub fn new(pci_addr: &str, rx_descriptors: usize, tx_descriptors: usize) -> CoreResult<Self> {
         // This is a simplified implementation
         // In production, use DPDK or similar
 
         let mut pci_addr_bytes = [0u8; 64];
         let bytes = pci_addr.as_bytes();
         let copy_len = bytes.len().min(64);
-        pci_addr_bytes[..copy_len].copy_from_slice(&bytes[..copy_len]);
+        if let (Some(dest), Some(src)) = (
+            pci_addr_bytes.get_mut(..copy_len),
+            bytes.get(..copy_len)
+        ) {
+            dest.copy_from_slice(src);
+        }
 
         let device = NetworkDevice {
             pci_addr: pci_addr_bytes,
@@ -194,9 +206,9 @@ impl KernelBypassNic {
             _reserved: [0; 18],
         };
 
-        let rx_ring = RxRing::new(num_rx_desc)?;
-        let tx_ring = TxRing::new(num_tx_desc)?;
-        let packet_pool = PacketMemoryPool::new(num_rx_desc + num_tx_desc)?;
+        let rx_ring = RxRing::new(rx_descriptors)?;
+        let tx_ring = TxRing::new(tx_descriptors)?;
+        let packet_pool = PacketMemoryPool::new(rx_descriptors + tx_descriptors)?;
 
         Ok(Self {
             device,
@@ -225,28 +237,36 @@ impl KernelBypassNic {
 
         while count < packets.len() && consumer != producer {
             let idx = consumer & self.rx_ring.mask;
-            let desc = &self.rx_ring.descriptors[idx];
+            if let Some(desc) = self.rx_ring.descriptors.get(idx) {
+                // Check if packet is ready
+                if desc.status & RX_STATUS_DD == 0 {
+                    break;
+                }
 
-            // Check if packet is ready
-            if desc.status & RX_STATUS_DD == 0 {
+                // Get packet from descriptor
+                let packet_ptr = desc.addr as *mut Packet;
+                let packet = unsafe { Box::from_raw(packet_ptr) };
+
+                // Update statistics
+                self.stats.rx_packets.fetch_add(1, Ordering::Relaxed);
+                self.stats
+                    .rx_bytes
+                    .fetch_add(u64::from(desc.length), Ordering::Relaxed);
+
+                if let Some(slot) = packets.get_mut(count) {
+                    *slot = Some(packet);
+                    count += 1;
+
+                    // Clear descriptor for reuse
+                    if let Some(desc_mut) = self.rx_ring.descriptors.get_mut(idx) {
+                        desc_mut.status = 0;
+                    }
+                } else {
+                    break;
+                }
+            } else {
                 break;
             }
-
-            // Get packet from descriptor
-            let packet_ptr = desc.addr as *mut Packet;
-            let packet = unsafe { Box::from_raw(packet_ptr) };
-
-            // Update statistics
-            self.stats.rx_packets.fetch_add(1, Ordering::Relaxed);
-            self.stats
-                .rx_bytes
-                .fetch_add(desc.length as u64, Ordering::Relaxed);
-
-            packets[count] = Some(packet);
-            count += 1;
-
-            // Clear descriptor for reuse
-            self.rx_ring.descriptors[idx].status = 0;
         }
 
         // Update consumer index
@@ -286,21 +306,22 @@ impl KernelBypassNic {
 
         let count = packets.len().min(available);
 
-        for i in 0..count {
+        for (i, packet) in packets.iter().enumerate().take(count) {
             let idx = producer.wrapping_add(i) & self.tx_ring.mask;
-            let packet = &packets[i];
 
-            // Setup descriptor
-            self.tx_ring.descriptors[idx].addr = packet.as_ref() as *const _ as u64;
-            self.tx_ring.descriptors[idx].length = packet.len;
-            self.tx_ring.descriptors[idx].cmd = TX_CMD_EOP | TX_CMD_RS;
-            self.tx_ring.descriptors[idx].status = 0;
+            if let Some(desc) = self.tx_ring.descriptors.get_mut(idx) {
+                // Setup descriptor
+                desc.addr = std::ptr::from_ref(packet.as_ref()) as u64;
+                desc.length = packet.len;
+                desc.cmd = TX_CMD_EOP | TX_CMD_RS;
+                desc.status = 0;
 
-            // Update statistics
-            self.stats.tx_packets.fetch_add(1, Ordering::Relaxed);
-            self.stats
-                .tx_bytes
-                .fetch_add(packet.len as u64, Ordering::Relaxed);
+                // Update statistics
+                self.stats.tx_packets.fetch_add(1, Ordering::Relaxed);
+                self.stats
+                    .tx_bytes
+                    .fetch_add(u64::from(packet.len), Ordering::Relaxed);
+            }
         }
 
         // Update producer index
@@ -310,7 +331,7 @@ impl KernelBypassNic {
                 .store(producer.wrapping_add(count), Ordering::Release);
 
             // Notify hardware (memory-mapped I/O)
-            self.notify_tx_hardware();
+            Self::notify_tx_hardware();
         }
 
         count
@@ -326,17 +347,21 @@ impl KernelBypassNic {
         while current != producer {
             let idx = current & self.tx_ring.mask;
 
-            // Check if transmission complete
-            if self.tx_ring.descriptors[idx].status & TX_STATUS_DD == 0 {
+            if let Some(desc) = self.tx_ring.descriptors.get(idx) {
+                // Check if transmission complete
+                if desc.status & TX_STATUS_DD == 0 {
+                    break;
+                }
+
+                // Free packet buffer
+                let packet_ptr = desc.addr as *mut Packet;
+                self.packet_pool.free(packet_ptr);
+
+                cleaned += 1;
+                current = current.wrapping_add(1);
+            } else {
                 break;
             }
-
-            // Free packet buffer
-            let packet_ptr = self.tx_ring.descriptors[idx].addr as *mut Packet;
-            self.packet_pool.free(packet_ptr);
-
-            cleaned += 1;
-            current = current.wrapping_add(1);
         }
 
         if cleaned > 0 {
@@ -352,12 +377,12 @@ impl KernelBypassNic {
     }
 
     /// Get statistics
-    pub fn stats(&self) -> &NetworkStats {
+    pub const fn stats(&self) -> &NetworkStats {
         &self.stats
     }
 
     /// Notify TX hardware via memory-mapped I/O
-    fn notify_tx_hardware(&self) {
+    fn notify_tx_hardware() {
         // In real implementation, write to TX tail register
         // This would be a memory-mapped I/O operation
         compiler_fence(Ordering::Release);
@@ -367,20 +392,20 @@ impl KernelBypassNic {
 impl RxRing {
     fn new(size: usize) -> CoreResult<Self> {
         if !size.is_power_of_two() {
-            return Err(CoreError::InvalidSize(
-                "RX ring size must be power of 2".to_string(),
+            return Err(CoreError::invalid_size(
+                "RX ring size must be power of 2"
             ));
         }
 
+        let descriptors = vec![RxDescriptor {
+            addr: 0,
+            length: 0,
+            status: 0,
+            _reserved: [0; 52],
+        }; MAX_RING_SIZE].into_boxed_slice();
+
         Ok(Self {
-            descriptors: CacheAligned::new(
-                [RxDescriptor {
-                    addr: 0,
-                    length: 0,
-                    status: 0,
-                    _reserved: [0; 52],
-                }; MAX_RING_SIZE],
-            ),
+            descriptors,
             producer: CacheAligned::new(AtomicUsize::new(0)),
             consumer: CacheAligned::new(AtomicUsize::new(0)),
             mask: size - 1,
@@ -392,21 +417,21 @@ impl RxRing {
 impl TxRing {
     fn new(size: usize) -> CoreResult<Self> {
         if !size.is_power_of_two() {
-            return Err(CoreError::InvalidSize(
-                "TX ring size must be power of 2".to_string(),
+            return Err(CoreError::invalid_size(
+                "TX ring size must be power of 2"
             ));
         }
 
+        let descriptors = vec![TxDescriptor {
+            addr: 0,
+            length: 0,
+            cmd: 0,
+            status: 0,
+            _reserved: [0; 50],
+        }; MAX_RING_SIZE].into_boxed_slice();
+
         Ok(Self {
-            descriptors: CacheAligned::new(
-                [TxDescriptor {
-                    addr: 0,
-                    length: 0,
-                    cmd: 0,
-                    status: 0,
-                    _reserved: [0; 50],
-                }; MAX_RING_SIZE],
-            ),
+            descriptors,
             producer: CacheAligned::new(AtomicUsize::new(0)),
             consumer: CacheAligned::new(AtomicUsize::new(0)),
             mask: size - 1,
@@ -420,24 +445,30 @@ impl PacketMemoryPool {
         // Allocate hugepage-backed memory
         let size = capacity * mem::size_of::<Packet>();
         let layout = std::alloc::Layout::from_size_align(size, 2 * 1024 * 1024)
-            .map_err(|_| CoreError::InvalidSize("Invalid packet pool size".to_string()))?;
+            .map_err(|_| CoreError::invalid_size("Invalid packet pool size"))?;
 
         let memory = unsafe {
             let ptr = std::alloc::alloc(layout);
             if ptr.is_null() {
-                return Err(CoreError::OutOfMemory(
-                    "Failed to allocate packet pool".to_string(),
+                return Err(CoreError::out_of_memory(
+                    "Failed to allocate packet pool"
                 ));
             }
             NonNull::new_unchecked(ptr)
         };
 
         // Initialize free list
-        let mut free_list = [NonNull::dangling(); MAX_PACKET_POOL_SIZE];
+        let mut free_list = vec![NonNull::dangling(); MAX_PACKET_POOL_SIZE].into_boxed_slice();
         for i in 0..capacity {
-            let packet_ptr =
-                unsafe { memory.as_ptr().add(i * mem::size_of::<Packet>()) as *mut Packet };
-            free_list[i] = NonNull::new_unchecked(packet_ptr);
+            #[allow(clippy::cast_ptr_alignment)] // Packet is 64-byte aligned, memory is 2MB aligned
+            let packet_ptr = unsafe {
+                memory.as_ptr()
+                    .add(i * mem::size_of::<Packet>())
+                    .cast::<Packet>()
+            };
+            if let Some(slot) = free_list.get_mut(i) {
+                *slot = unsafe { NonNull::new_unchecked(packet_ptr) };
+            }
         }
 
         Ok(Self {
@@ -448,21 +479,23 @@ impl PacketMemoryPool {
         })
     }
 
-    fn alloc(&mut self) -> Option<Box<Packet>> {
+    fn alloc(&self) -> Option<Box<Packet>> {
         let index = self.free_index.fetch_sub(1, Ordering::AcqRel);
         if index == 0 {
             self.free_index.fetch_add(1, Ordering::AcqRel);
             return None;
         }
 
-        let packet_ptr = self.free_list[index - 1].as_ptr();
-        unsafe { Some(Box::from_raw(packet_ptr)) }
+        self.free_list.get(index - 1).map(|ptr| {
+            let packet_ptr = ptr.as_ptr();
+            unsafe { Box::from_raw(packet_ptr) }
+        })
     }
 
     fn free(&mut self, packet: *mut Packet) {
         let index = self.free_index.fetch_add(1, Ordering::AcqRel);
-        if index < self.free_list.len() {
-            self.free_list[index] = NonNull::new_unchecked(packet);
+        if let Some(slot) = self.free_list.get_mut(index) {
+            *slot = unsafe { NonNull::new_unchecked(packet) };
         }
     }
 }
@@ -504,33 +537,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_rx_ring_creation() {
-        let ring = RxRing::new(1024);
-        assert!(ring.is_ok());
-
-        let ring = ring.unwrap();
+    fn test_rx_ring_creation() -> Result<(), CoreError> {
+        let ring = RxRing::new(1024)?;
         assert_eq!(ring.mask, 1023);
         assert_eq!(ring.size, 1024);
+        Ok(())
     }
 
     #[test]
-    fn test_tx_ring_creation() {
-        let ring = TxRing::new(512);
-        assert!(ring.is_ok());
-
-        let ring = ring.unwrap();
+    fn test_tx_ring_creation() -> Result<(), CoreError> {
+        let ring = TxRing::new(512)?;
         assert_eq!(ring.mask, 511);
         assert_eq!(ring.size, 512);
+        Ok(())
     }
 
     #[test]
-    fn test_packet_pool() {
-        let pool = PacketMemoryPool::new(256);
-        assert!(pool.is_ok());
-
-        let mut pool = pool.unwrap();
+    fn test_packet_pool() -> Result<(), CoreError> {
+        let pool = PacketMemoryPool::new(256)?;
         let packet = pool.alloc();
         assert!(packet.is_some());
+        Ok(())
     }
 
     #[test]

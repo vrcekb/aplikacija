@@ -269,7 +269,7 @@ impl Worker {
         shutdown_signal: &ShutdownSignal,
     ) {
         // Set CPU affinity if specified
-        if let Some(_core_id) = cpu_affinity {
+        if let Some(core_id) = cpu_affinity {
             #[cfg(target_os = "linux")]
             {
                 use core_affinity::{set_for_current, CoreId};
