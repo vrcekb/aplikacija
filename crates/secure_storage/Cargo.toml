@@ -1,0 +1,115 @@
+[package]
+name = "secure_storage"
+version = "0.1.0"
+edition = "2021"
+authors = ["TallyIO Team"]
+description = "Secure storage module for TallyIO - encryption and secure key management"
+license = "MIT"
+repository = "https://github.com/vrcekb/tallyio"
+keywords = ["encryption", "security", "storage", "vault", "crypto"]
+categories = ["cryptography", "database", "authentication"]
+
+[dependencies]
+# Core dependencies
+tokio = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+tracing = { workspace = true }
+
+# Cryptography
+aes-gcm = "0.10"
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+ed25519-dalek = "2.1"
+rand = "0.8"
+zeroize = { version = "1.7", features = ["zeroize_derive"] }
+secrecy = "0.8"
+getrandom = "0.2"
+
+# Production-ready secp256k1 for ultra-performance
+secp256k1 = { version = "0.28", features = ["recovery", "global-context", "rand-std"] }
+k256 = { version = "0.13", features = ["ecdsa", "sha256", "arithmetic"] }
+elliptic-curve = { version = "0.13", features = ["arithmetic", "hazmat"] }
+crypto-bigint = { version = "0.5", features = ["rand_core"] }
+subtle = "2.5"
+
+# Hardware acceleration support
+aes = { version = "0.8", features = ["hazmat"] }
+# sha2-asm = { version = "0.6", optional = true }  # Disabled due to Windows MSVC compatibility
+
+# SIMD optimizations for batch operations
+wide = "0.7"
+
+# CPU feature detection (already defined below)
+
+# BLS and threshold cryptography for MPC
+bls12_381 = "0.8"
+group = "0.13"
+ff = "0.13"
+pairing = "0.23"
+threshold_crypto = "0.4"
+sha2 = { version = "0.10", default-features = false }  # Disable sha2-asm for Windows MSVC compatibility
+hkdf = "0.12"
+hmac = "0.12"
+
+# Polynomial operations for secret sharing
+polynomial = "0.2"
+
+# Secure storage
+# sqlx = { workspace = true }  # Temporarily disabled due to conflict
+rusqlite = { workspace = true }
+
+# HashiCorp Vault client
+vaultrs = { version = "0.7", optional = true }
+url = { version = "2.5", optional = true }
+
+# HSM support (PKCS#11)
+cryptoki = { version = "0.6", optional = true }
+
+# Concurrency
+dashmap = { workspace = true }
+parking_lot = "0.12"
+
+# Time and utilities
+chrono = { workspace = true, features = ["serde"] }
+
+# Hardware support
+raw-cpuid = "11.0"
+uuid = { workspace = true }
+urlencoding = "2.1"
+base64 = "0.22"
+hex = "0.4"
+
+# Memory protection
+# mlock = "0.2"  # Not available, using libc directly
+memmap2 = "0.9"
+libc = "0.2"
+
+# Validation
+garde = { workspace = true }
+
+# Additional dependencies
+async-trait = "0.1"
+num_cpus = "1.16"
+bitflags = "2.4"
+
+[dev-dependencies]
+tempfile = "3.8"
+criterion = { version = "0.5", features = ["html_reports"] }
+rand = "0.8"
+tokio-test = "0.4"
+
+[[bench]]
+name = "mpc_bench"
+harness = false
+
+[features]
+default = ["local-vault"]
+vault = ["dep:vaultrs", "dep:url"]
+hsm = ["dep:cryptoki"]
+local-vault = []
+sgx-production = []
+
+

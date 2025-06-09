@@ -1,0 +1,113 @@
+[package]
+name = "tallyio-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["TallyIO Team"]
+license = "MIT"
+repository = "https://github.com/tallyio/tallyio"
+description = "Ultra-performant core engine for TallyIO MEV/DeFi platform"
+keywords = ["mev", "defi", "performance", "trading", "core"]
+categories = ["finance", "algorithms", "concurrency"]
+
+[lib]
+name = "tallyio_core"
+crate-type = ["lib"]
+
+[dependencies]
+# Core dependencies
+tokio = { version = "1.35", features = ["rt-multi-thread", "macros", "time", "sync"] }
+async-trait = "0.1"
+futures = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Performance & Concurrency
+dashmap = "5.5"
+crossbeam = "0.8"
+rayon = "1.8"
+parking_lot = "0.12"
+
+# Metrics & Observability
+tracing = "0.1"
+metrics = "0.22"
+
+# Validation
+garde = { version = "0.18", features = ["derive"] }
+
+# Configuration
+config = "0.14"
+toml = "0.8"
+
+# Cryptography (for secure operations) - temporarily disabled due to Windows build issues
+# ring = "0.17"  # Disabled due to Windows MSVC compatibility (uses .S assembly files)
+# sha2 = "0.10"  # Temporarily disabled due to sha2-asm Windows build issues
+digest = "0.10"  # Pure Rust alternative for hashing
+zeroize = { version = "1.7", features = ["derive"] }
+
+# Additional dependencies for compatibility
+hex = "0.4"
+
+# Core-specific dependencies
+num_cpus = "1.16"
+core_affinity = { version = "0.8", optional = true }
+libc = "0.2"
+
+# Work-stealing optimization
+crossbeam-deque = "0.8"
+
+# Memory optimization
+fastrand = "2.0"
+thread_local = "1.1"
+
+[dev-dependencies]
+# Testing
+mockall = "0.12"
+proptest = "1.4"
+criterion = { version = "0.5", features = ["html_reports"] }
+tokio-test = "0.4"
+
+[features]
+default = ["std", "numa"]
+std = []
+numa = ["core_affinity"]
+simd = []
+work-stealing = []
+jemalloc = []
+
+[[bench]]
+name = "engine_bench"
+harness = false
+
+[[bench]]
+name = "mempool_bench"
+harness = false
+
+[[bench]]
+name = "work_stealing_bench"
+harness = false
+
+[[bench]]
+name = "simple_bench"
+harness = false
+
+[[bench]]
+name = "advanced_features"
+harness = false
+
+[[bench]]
+name = "ultra_performance_bench"
+harness = false
+
+[[bench]]
+name = "system_optimization_bench"
+harness = false
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

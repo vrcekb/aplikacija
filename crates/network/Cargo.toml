@@ -1,0 +1,92 @@
+[package]
+name = "tallyio-network"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Ultra-performant network layer for TallyIO with <1ms latency"
+keywords = ["network", "websocket", "http", "p2p", "performance"]
+categories = ["network-programming", "web-programming", "asynchronous"]
+
+[dependencies]
+# Core dependencies
+tokio = { workspace = true, features = ["net", "time", "sync", "rt-multi-thread"] }
+async-trait = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Performance & Concurrency
+dashmap = { workspace = true }
+crossbeam = { workspace = true }
+parking_lot = { workspace = true }
+
+# Networking - HTTP
+reqwest = { workspace = true, features = ["http2", "stream", "gzip", "brotli"] }
+hyper = { version = "1.0", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full"] }
+http = "1.0"
+tower = { version = "0.4", features = ["full"] }
+tower-http = { version = "0.5", features = ["full"] }
+
+# Networking - WebSocket
+tokio-tungstenite = { workspace = true, features = ["native-tls"] }
+tungstenite = { workspace = true }
+url = "2.5"
+
+# TLS and Security
+rustls = "0.22"
+rustls-pemfile = "2.0"
+webpki-roots = "0.26"
+
+# Metrics & Observability
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+metrics = { workspace = true }
+
+# Validation
+garde = { workspace = true }
+
+# Utilities
+bytes = "1.5"
+pin-project-lite = "0.2"
+
+# Internal dependencies
+tallyio-core = { path = "../core" }
+
+[dev-dependencies]
+# Testing
+mockall = { workspace = true }
+proptest = { workspace = true }
+criterion = { workspace = true }
+tokio-test = "0.4"
+wiremock = "0.6"
+
+[features]
+default = ["http2", "websocket", "load-balancer"]
+http2 = []
+http3 = ["reqwest/http3"]
+websocket = []
+p2p = []
+load-balancer = []
+metrics = []
+
+[[bench]]
+name = "http_bench"
+harness = false
+
+[[bench]]
+name = "websocket_bench"
+harness = false
+
+[[bench]]
+name = "load_balancer_bench"
+harness = false

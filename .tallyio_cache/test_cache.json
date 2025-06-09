@@ -1,0 +1,62 @@
+{
+  "forbidden_patterns": {
+    "project_hash": "f71ad29c3364187221e2d1ab234771fde5c7cfa00b4c95ddce6a166c958efd84",
+    "timestamp": 1749426487.343877,
+    "result": {
+      "name": "Forbidden Patterns Check",
+      "success": true,
+      "message": "No forbidden patterns found (production-ready code)",
+      "duration": 0.14101004600524902,
+      "details": "Checked 169 Rust files for 6 forbidden patterns",
+      "error_output": null
+    }
+  },
+  "security_audit": {
+    "project_hash": "37c1b830e8b9b8dcb3a0662860845e1990a7d12387a3f356736b8a4e56fdec18",
+    "timestamp": 1749426510.0728655,
+    "result": {
+      "name": "Security Audit",
+      "success": true,
+      "message": "Security audit passed",
+      "duration": 20.360210180282593,
+      "details": "TallyIO security policy: Zero tolerance for vulnerabilities",
+      "error_output": null
+    }
+  },
+  "cargo_fmt": {
+    "project_hash": "585e7df7fd9c8e283db9725ea6fe8b1d36eda6063fa770519a41895aeab75bce",
+    "timestamp": 1749426522.7103007,
+    "result": {
+      "name": "Cargo Format",
+      "success": true,
+      "message": "Code formatting auto-fixed successfully",
+      "duration": 10.343611240386963,
+      "details": "Formatting issues were detected and automatically corrected",
+      "error_output": null
+    }
+  },
+  "cargo_clippy": {
+    "project_hash": "585e7df7fd9c8e283db9725ea6fe8b1d36eda6063fa770519a41895aeab75bce",
+    "timestamp": 1749426528.6537418,
+    "result": {
+      "name": "Cargo Clippy",
+      "success": false,
+      "message": "Found 2 clippy errors and 1 warnings",
+      "duration": 3.72298526763916,
+      "details": "Run 'cargo clippy --fix' to auto-fix issues",
+      "error_output": "    Checking tallyio-core v0.1.0 (E:\\ZETA\\Tallyio\\crates\\core)\n    Checking tallyio-data-storage v0.1.0 (E:\\ZETA\\Tallyio\\crates\\data_storage)\nerror[E0277]: the trait bound `u32: std::convert::TryFrom<f64>` is not satisfied\n    --> crates\\core\\src\\engine\\mod.rs:1068:17\n     |\n1068 |                 u32::try_from(\n     |                 ^^^ the trait `std::convert::From<f64>` is not implemented for `u32`\n     |\n     = help: the following other types implement trait `std::convert::From<T>`:\n               `u32` implements `std::convert::From<bool>`\n               `u32` implements `std::convert::From<char>`\n               `u32` implements `std::convert::From<std::ascii::Char>`\n               `u32` implements `std::convert::From<std::net::Ipv4Addr>`\n               `u32` implements `std::convert::From<u16>`\n               `u32` implements `std::convert::From<u8>`\n               `u32` implements `std::convert::From<zerocopy::byteorder::U16<O>>`\n               `u32` implements `std::convert::From<zerocopy::byteorder::U32<O>>`\n     = note: required for `f64` to implement `std::convert::Into<u32>`\n     = note: required for `u32` to implement `std::convert::TryFrom<f64>`\n\nerror[E0277]: the trait bound `u32: std::convert::From<f64>` is not satisfied\n    --> crates\\core\\src\\engine\\mod.rs:1068:17\n     |\n1068 | /                 u32::try_from(\n1069 | |                     aggregated\n1070 | |                         .average_execution_time_us\n1071 | |                         .max(0.0_f64)\n1072 | |                         .min(f64::from(u32::MAX)),\n1073 | |                 )\n     | |_________________^ the trait `std::convert::From<f64>` is not implemented for `u32`\n     |\n     = help: the following other types implement trait `std::convert::From<T>`:\n               `u32` implements `std::convert::From<bool>`\n               `u32` implements `std::convert::From<char>`\n               `u32` implements `std::convert::From<std::ascii::Char>`\n               `u32` implements `std::convert::From<std::net::Ipv4Addr>`\n               `u32` implements `std::convert::From<u16>`\n               `u32` implements `std::convert::From<u8>`\n               `u32` implements `std::convert::From<zerocopy::byteorder::U16<O>>`\n               `u32` implements `std::convert::From<zerocopy::byteorder::U32<O>>`\n     = note: required for `f64` to implement `std::convert::Into<u32>`\n     = note: required for `u32` to implement `std::convert::TryFrom<f64>`\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `tallyio-core` (lib) due to 2 previous errors\nwarning: build failed, waiting for other jobs to finish...\nerror: could not compile `tallyio-core` (lib test) due to 2 previous errors\n"
+    }
+  },
+  "critical_tests": {
+    "project_hash": "86580246dbabc41acc751e8125123708c92fb4bf43fb1643c6e6d4c0814493d6",
+    "timestamp": 1749417062.657051,
+    "result": {
+      "name": "Critical Test Categories",
+      "success": true,
+      "message": "All critical tests passed (26 tests)",
+      "duration": 1.8163070678710938,
+      "details": "security_tests: 6 passed, 0 failed; economic_tests: 11 passed, 0 failed; state_consistency_tests: 4 passed, 0 failed; timing_tests: 5 passed, 0 failed",
+      "error_output": null
+    }
+  }
+}

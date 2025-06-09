@@ -1,0 +1,38 @@
+{
+  "forbidden_patterns": {
+    "project_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "timestamp": 1749413015.9631689,
+    "result": {
+      "name": "Forbidden Patterns Check",
+      "success": true,
+      "message": "No forbidden patterns found (production-ready code)",
+      "duration": 0.0,
+      "details": "Checked 0 Rust files for 6 forbidden patterns",
+      "error_output": null
+    }
+  },
+  "security_audit": {
+    "project_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "timestamp": 1749413018.992193,
+    "result": {
+      "name": "Security Audit",
+      "success": true,
+      "message": "Security audit passed",
+      "duration": 2.9174346923828125,
+      "details": "TallyIO security policy: Zero tolerance for vulnerabilities",
+      "error_output": null
+    }
+  },
+  "cargo_fmt": {
+    "project_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "timestamp": 1749413020.1028676,
+    "result": {
+      "name": "Cargo Format",
+      "success": false,
+      "message": "Failed to run cargo fmt auto-fix",
+      "duration": 1.0082476139068604,
+      "details": "cargo fmt command failed",
+      "error_output": "Failed to find targets\nThis utility formats all bin and lib files of the current crate using rustfmt.\n\nUsage: cargo fmt [OPTIONS] [-- <rustfmt_options>...]\n\nArguments:\n  [rustfmt_options]...  Options passed to rustfmt\n\nOptions:\n  -q, --quiet\n          No output printed to stdout\n  -v, --verbose\n          Use verbose output\n      --version\n          Print rustfmt version and exit\n  -p, --package <package>...\n          Specify package to format\n      --manifest-path <manifest-path>\n          Specify path to Cargo.toml\n      --message-format <message-format>\n          Specify message-format: short|json|human\n      --all\n          Format all packages, and also their local path-based dependencies\n      --check\n          Run rustfmt in check mode\n  -h, --help\n          Print help\n\n"
+    }
+  }
+}

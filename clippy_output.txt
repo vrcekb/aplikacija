@@ -1,0 +1,890 @@
+    Checking tallyio-core v0.1.0 (E:\ZETA\Tallyio\crates\core)
+    Checking secure_storage v0.1.0 (E:\ZETA\Tallyio\crates\secure_storage)
+error: adding items after statements is confusing, since items exist from the start of the scope
+   --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:654:9
+    |
+654 |         const NUM_WINDOWS: usize = 64;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+    = note: `-D clippy::items-after-statements` implied by `-D clippy::pedantic`
+    = help: to override `-D clippy::pedantic` add `#[allow(clippy::items_after_statements)]`
+
+error: adding items after statements is confusing, since items exist from the start of the scope
+   --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:655:9
+    |
+655 |         const WINDOW_SIZE: usize = 4;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+
+error: adding items after statements is confusing, since items exist from the start of the scope
+   --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:656:9
+    |
+656 |         const TABLE_SIZE: usize = 1 << WINDOW_SIZE; // 16 entries per window
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+
+error: docs for function returning `Result` missing `# Errors` section
+   --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:724:5
+    |
+724 |     pub fn scalar_multiply(&self, scalar: &Scalar) -> Secp256k1Result<ProjectivePoint> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+    = note: `-D clippy::missing-errors-doc` implied by `-D clippy::pedantic`
+    = help: to override `-D clippy::pedantic` add `#[allow(clippy::missing_errors_doc)]`
+
+error: default numeric fallback might occur
+   --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:743:49
+    |
+743 |                 (scalar_bytes[31 - byte_idx] >> 4) & 0x0F
+    |                                                 ^ help: consider adding suffix: `4_i32`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+    = note: requested on the command line with `-D clippy::default-numeric-fallback`
+
+error: this function's return value is unnecessarily wrapped by `Option`
+   --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:803:5
+    |
+803 |     fn detect() -> Option<Self> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+    = note: `-D clippy::unnecessary-wraps` implied by `-D clippy::pedantic`
+    = help: to override `-D clippy::pedantic` add `#[allow(clippy::unnecessary_wraps)]`
+help: remove `Option` from the return type...
+    |
+803 -     fn detect() -> Option<Self> {
+803 +     fn detect() -> crypto::secp256k1_optimized::HardwareContext {
+    |
+help: ...and then remove the surrounding `Some()` from returning expressions
+    |
+844 ~             Self {
+845 +                 capabilities,
+846 +                 cache_line_size,
+847 +             }
+    |
+
+error: docs for function returning `Result` missing `# Errors` section
+   --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:908:5
+    |
+908 |     pub fn public_key(&self, context: &OptimizedSecp256k1) -> Secp256k1Result<OptimizedPublicKey> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+error: this method could have a `#[must_use]` attribute
+   --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:945:5
+    |
+945 |     pub fn as_bytes(&self) -> &[u8; 32] {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn as_bytes(&self) -> &[u8; 32]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+    = note: requested on the command line with `-D clippy::must-use-candidate`
+
+error: this could be a `const fn`
+   --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:945:5
+    |
+945 | /     pub fn as_bytes(&self) -> &[u8; 32] {
+946 | |         &self.key_bytes
+947 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+    = note: `-D clippy::missing-const-for-fn` implied by `-D clippy::nursery`
+    = help: to override `-D clippy::nursery` add `#[allow(clippy::missing_const_for_fn)]`
+help: make the function `const`
+    |
+945 |     pub const fn as_bytes(&self) -> &[u8; 32] {
+    |         +++++
+
+error: this method could have a `#[must_use]` attribute
+   --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:993:5
+    |
+993 |     pub fn as_compressed(&self) -> &[u8; 33] {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn as_compressed(&self) -> &[u8; 33]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this could be a `const fn`
+   --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:993:5
+    |
+993 | /     pub fn as_compressed(&self) -> &[u8; 33] {
+994 | |         &self.compressed
+995 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+993 |     pub const fn as_compressed(&self) -> &[u8; 33] {
+    |         +++++
+
+error: this method could have a `#[must_use]` attribute
+   --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:998:5
+    |
+998 |     pub fn as_point(&self) -> &ProjectivePoint {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn as_point(&self) -> &ProjectivePoint`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this could be a `const fn`
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:998:5
+     |
+998  | /     pub fn as_point(&self) -> &ProjectivePoint {
+999  | |         &self.point
+1000 | |     }
+     | |_____^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+     |
+998  |     pub const fn as_point(&self) -> &ProjectivePoint {
+     |         +++++
+
+error: this method could have a `#[must_use]` attribute
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1010:5
+     |
+1010 |     pub fn new(max_batch_size: usize, hw_accel: bool) -> Self {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new(max_batch_size: usize, hw_accel: bool) -> Self`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1051:5
+     |
+1051 |     pub fn len(&self) -> usize {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn len(&self) -> usize`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this could be a `const fn`
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1051:5
+     |
+1051 | /     pub fn len(&self) -> usize {
+1052 | |         self.signatures.len()
+1053 | |     }
+     | |_____^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+     |
+1051 |     pub const fn len(&self) -> usize {
+     |         +++++
+
+error: this method could have a `#[must_use]` attribute
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1056:5
+     |
+1056 |     pub fn is_empty(&self) -> bool {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn is_empty(&self) -> bool`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this could be a `const fn`
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1056:5
+     |
+1056 | /     pub fn is_empty(&self) -> bool {
+1057 | |         self.signatures.is_empty()
+1058 | |     }
+     | |_____^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+     |
+1056 |     pub const fn is_empty(&self) -> bool {
+     |         +++++
+
+error: you have declared `#[inline(always)]` on `sha256`. This is usually a bad idea
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:171:5
+    |
+171 |     #[inline(always)]
+    |     ^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#inline_always
+    = note: `-D clippy::inline-always` implied by `-D clippy::pedantic`
+    = help: to override `-D clippy::pedantic` add `#[allow(clippy::inline_always)]`
+
+error: casts from `u64` to `u128` can be expressed infallibly using `From`
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:194:34
+    |
+194 |         if elapsed.as_micros() > self.perf_config.max_sha256_latency_us as u128 {
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: an `as` cast can become silently lossy if the types change in the future
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_lossless
+    = note: `-D clippy::cast-lossless` implied by `-D clippy::pedantic`
+    = help: to override `-D clippy::pedantic` add `#[allow(clippy::cast_lossless)]`
+help: use `u128::from` instead
+    |
+194 -         if elapsed.as_micros() > self.perf_config.max_sha256_latency_us as u128 {
+194 +         if elapsed.as_micros() > u128::from(self.perf_config.max_sha256_latency_us) {
+    |
+
+error: casting `u128` to `u64` may truncate the value
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:196:28
+    |
+196 |                 actual_us: elapsed.as_micros() as u64,
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+    = note: requested on the command line with `-D clippy::cast-possible-truncation`
+help: ... or use `try_from` and handle the error accordingly
+    |
+196 -                 actual_us: elapsed.as_micros() as u64,
+196 +                 actual_us: u64::try_from(elapsed.as_micros()),
+    |
+
+error: you have declared `#[inline(always)]` on `hmac_sha256`. This is usually a bad idea
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:216:5
+    |
+216 |     #[inline(always)]
+    |     ^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#inline_always
+
+error: casts from `u64` to `u128` can be expressed infallibly using `From`
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:245:34
+    |
+245 |         if elapsed.as_micros() > self.perf_config.max_hmac_latency_us as u128 {
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: an `as` cast can become silently lossy if the types change in the future
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_lossless
+help: use `u128::from` instead
+    |
+245 -         if elapsed.as_micros() > self.perf_config.max_hmac_latency_us as u128 {
+245 +         if elapsed.as_micros() > u128::from(self.perf_config.max_hmac_latency_us) {
+    |
+
+error: casting `u128` to `u64` may truncate the value
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:247:28
+    |
+247 |                 actual_us: elapsed.as_micros() as u64,
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+    |
+247 -                 actual_us: elapsed.as_micros() as u64,
+247 +                 actual_us: u64::try_from(elapsed.as_micros()),
+    |
+
+error: casts from `u64` to `u128` can be expressed infallibly using `From`
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:298:34
+    |
+298 |         if elapsed.as_micros() > target_us as u128 {
+    |                                  ^^^^^^^^^^^^^^^^^
+    |
+    = help: an `as` cast can become silently lossy if the types change in the future
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_lossless
+help: use `u128::from` instead
+    |
+298 -         if elapsed.as_micros() > target_us as u128 {
+298 +         if elapsed.as_micros() > u128::from(target_us) {
+    |
+
+error: casting `u128` to `u64` may truncate the value
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:300:28
+    |
+300 |                 actual_us: elapsed.as_micros() as u64,
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+    |
+300 -                 actual_us: elapsed.as_micros() as u64,
+300 +                 actual_us: u64::try_from(elapsed.as_micros()),
+    |
+
+error: unused `self` argument
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:316:34
+    |
+316 |     fn sha256_software_optimized(&self, data: &[u8]) -> HashResult<[u8; 32]> {
+    |                                  ^^^^^
+    |
+    = help: consider refactoring to an associated function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_self
+    = note: `-D clippy::unused-self` implied by `-D clippy::pedantic`
+    = help: to override `-D clippy::pedantic` add `#[allow(clippy::unused_self)]`
+
+error: this function's return value is unnecessarily wrapped by `Result`
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:316:5
+    |
+316 |     fn sha256_software_optimized(&self, data: &[u8]) -> HashResult<[u8; 32]> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+316 -     fn sha256_software_optimized(&self, data: &[u8]) -> HashResult<[u8; 32]> {
+316 +     fn sha256_software_optimized(&self, data: &[u8]) -> [u8; 32] {
+    |
+help: ...and then remove the surrounding `Ok()` from returning expressions
+    |
+320 -         Ok(result.into())
+320 +         result.into()
+    |
+
+error: unused `self` argument
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:331:32
+    |
+331 |     fn hmac_software_optimized(&self, key: &[u8], data: &[u8]) -> HashResult<[u8; 32]> {
+    |                                ^^^^^
+    |
+    = help: consider refactoring to an associated function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_self
+
+error: this method could have a `#[must_use]` attribute
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:415:5
+    |
+415 |     pub fn new(max_batch_size: usize, hw_accel: bool) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new(max_batch_size: usize, hw_accel: bool) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: docs for function returning `Result` missing `# Errors` section
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:424:5
+    |
+424 |     pub fn add_message(&mut self, message: Vec<u8>) -> HashResult<()> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+error: this method could have a `#[must_use]` attribute
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:441:5
+    |
+441 |     pub fn len(&self) -> usize {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn len(&self) -> usize`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this could be a `const fn`
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:441:5
+    |
+441 | /     pub fn len(&self) -> usize {
+442 | |         self.messages.len()
+443 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+441 |     pub const fn len(&self) -> usize {
+    |         +++++
+
+error: this method could have a `#[must_use]` attribute
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:446:5
+    |
+446 |     pub fn is_empty(&self) -> bool {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn is_empty(&self) -> bool`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this could be a `const fn`
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:446:5
+    |
+446 | /     pub fn is_empty(&self) -> bool {
+447 | |         self.messages.is_empty()
+448 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+446 |     pub const fn is_empty(&self) -> bool {
+    |         +++++
+
+error: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> crates\secure_storage\src\crypto\mod.rs:130:32
+    |
+130 |         self.update_sign_stats(elapsed.as_micros() as f64);
+    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+    = note: requested on the command line with `-D clippy::cast-precision-loss`
+
+error: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> crates\secure_storage\src\crypto\mod.rs:159:34
+    |
+159 |         self.update_verify_stats(elapsed.as_micros() as f64);
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+error: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> crates\secure_storage\src\crypto\mod.rs:184:33
+    |
+184 |         self.update_batch_stats(elapsed.as_micros() as f64, batch.len());
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+error: default numeric fallback might occur
+   --> crates\secure_storage\src\crypto\mod.rs:207:53
+    |
+207 |             (self.stats.avg_sign_time_us * (count - 1.0) + elapsed_us) / count;
+    |                                                     ^^^ help: consider adding suffix: `1.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> crates\secure_storage\src\crypto\mod.rs:210:25
+    |
+210 |         if elapsed_us > 50.0 {
+    |                         ^^^^ help: consider adding suffix: `50.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> crates\secure_storage\src\crypto\mod.rs:205:21
+    |
+205 |         let count = self.stats.signatures_created as f64;
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+error: multiply and add expressions can be calculated more efficiently and accurately
+   --> crates\secure_storage\src\crypto\mod.rs:207:13
+    |
+207 |             (self.stats.avg_sign_time_us * (count - 1.0) + elapsed_us) / count;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `self.stats.avg_sign_time_us.mul_add(count - 1.0, elapsed_us)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#suboptimal_flops
+    = note: `-D clippy::suboptimal-flops` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::suboptimal_flops)]`
+
+error: default numeric fallback might occur
+   --> crates\secure_storage\src\crypto\mod.rs:222:55
+    |
+222 |             (self.stats.avg_verify_time_us * (count - 1.0) + elapsed_us) / count;
+    |                                                       ^^^ help: consider adding suffix: `1.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> crates\secure_storage\src\crypto\mod.rs:225:25
+    |
+225 |         if elapsed_us > 200.0 {
+    |                         ^^^^^ help: consider adding suffix: `200.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> crates\secure_storage\src\crypto\mod.rs:220:21
+    |
+220 |         let count = self.stats.signatures_verified as f64;
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+error: multiply and add expressions can be calculated more efficiently and accurately
+   --> crates\secure_storage\src\crypto\mod.rs:222:13
+    |
+222 |             (self.stats.avg_verify_time_us * (count - 1.0) + elapsed_us) / count;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `self.stats.avg_verify_time_us.mul_add(count - 1.0, elapsed_us)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#suboptimal_flops
+
+error: default numeric fallback might occur
+   --> crates\secure_storage\src\crypto\mod.rs:235:25
+    |
+235 |         let target_us = 500.0 * (batch_size as f64 / 4.0).max(1.0);
+    |                         ^^^^^ help: consider adding suffix: `500.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: casting `usize` to `f64` causes a loss of precision on targets with 64-bit wide pointers (`usize` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> crates\secure_storage\src\crypto\mod.rs:235:34
+    |
+235 |         let target_us = 500.0 * (batch_size as f64 / 4.0).max(1.0);
+    |                                  ^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+error: `panic` should not be present in production code
+   --> crates\secure_storage\src\crypto\mod.rs:247:13
+    |
+247 |             panic!("Critical: Failed to initialize TallyIO crypto context - system compromised")
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#panic
+    = note: requested on the command line with `-D clippy::panic`
+
+error: variables can be used directly in the `format!` string
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1074:9
+     |
+1074 |         assert!(elapsed.as_micros() < 1000, "Initialization too slow: {:?}", elapsed);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+     = note: `-D clippy::uninlined-format-args` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::uninlined_format_args)]`
+help: change this to
+     |
+1074 -         assert!(elapsed.as_micros() < 1000, "Initialization too slow: {:?}", elapsed);
+1074 +         assert!(elapsed.as_micros() < 1000, "Initialization too slow: {elapsed:?}");
+     |
+
+error: variables can be used directly in the `format!` string
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1092:9
+     |
+1092 |         assert!(elapsed.as_micros() < 100, "Key generation too slow: {:?}", elapsed);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+     |
+1092 -         assert!(elapsed.as_micros() < 100, "Key generation too slow: {:?}", elapsed);
+1092 +         assert!(elapsed.as_micros() < 100, "Key generation too slow: {elapsed:?}");
+     |
+
+error: variables can be used directly in the `format!` string
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1114:9
+     |
+1114 |         assert!(elapsed.as_micros() < 50, "Signing too slow: {:?}", elapsed);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+     |
+1114 -         assert!(elapsed.as_micros() < 50, "Signing too slow: {:?}", elapsed);
+1114 +         assert!(elapsed.as_micros() < 50, "Signing too slow: {elapsed:?}");
+     |
+
+error: variables can be used directly in the `format!` string
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1136:9
+     |
+1136 |         assert!(elapsed.as_micros() < 200, "Verification too slow: {:?}", elapsed);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+     |
+1136 -         assert!(elapsed.as_micros() < 200, "Verification too slow: {:?}", elapsed);
+1136 +         assert!(elapsed.as_micros() < 200, "Verification too slow: {elapsed:?}");
+     |
+
+error: default numeric fallback might occur
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1150:18
+     |
+1150 |         for i in 0..4 {
+     |                  ^ help: consider adding suffix: `0_i32`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1150:21
+     |
+1150 |         for i in 0..4 {
+     |                     ^ help: consider adding suffix: `4_i32`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: casting `i32` to `u8` may truncate the value
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1153:33
+     |
+1153 |             let message_hash = [i as u8; 32];
+     |                                 ^^^^^^^
+     |
+     = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+     = note: requested on the command line with `-D clippy::cast-possible-truncation`
+help: ... or use `try_from` and handle the error accordingly
+     |
+1153 -             let message_hash = [i as u8; 32];
+1153 +             let message_hash = [u8::try_from(i); 32];
+     |
+
+error: casting `i32` to `u8` may lose the sign of the value
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1153:33
+     |
+1153 |             let message_hash = [i as u8; 32];
+     |                                 ^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
+     = note: requested on the command line with `-D clippy::cast-sign-loss`
+
+error: variables can be used directly in the `format!` string
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1164:9
+     |
+1164 |         assert!(elapsed.as_micros() < 500, "Batch verification too slow: {:?}", elapsed);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+     |
+1164 -         assert!(elapsed.as_micros() < 500, "Batch verification too slow: {:?}", elapsed);
+1164 +         assert!(elapsed.as_micros() < 500, "Batch verification too slow: {elapsed:?}");
+     |
+
+error: it is more concise to loop over references to containers instead of using explicit iteration methods
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1178:18
+     |
+1178 |         for b in bytes.iter_mut() {
+     |                  ^^^^^^^^^^^^^^^^ help: to write this more concisely, try: `&mut bytes`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#explicit_iter_loop
+     = note: `-D clippy::explicit-iter-loop` implied by `-D clippy::pedantic`
+     = help: to override `-D clippy::pedantic` add `#[allow(clippy::explicit_iter_loop)]`
+
+error: variables can be used directly in the `format!` string
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1189:9
+     |
+1189 |         assert!(elapsed.as_micros() < 100, "Scalar multiplication too slow: {:?}", elapsed);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+     |
+1189 -         assert!(elapsed.as_micros() < 100, "Scalar multiplication too slow: {:?}", elapsed);
+1189 +         assert!(elapsed.as_micros() < 100, "Scalar multiplication too slow: {elapsed:?}");
+     |
+
+error: used `unwrap()` on an `Option` value
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1204:18
+     |
+1204 |         let hw = hw_context.unwrap();
+     |                  ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: if this value is `None`, it will panic
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unwrap_used
+     = note: requested on the command line with `-D clippy::unwrap-used`
+
+error: default numeric fallback might occur
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1224:18
+     |
+1224 |         for i in 0..10 {
+     |                  ^ help: consider adding suffix: `0_i32`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1224:21
+     |
+1224 |         for i in 0..10 {
+     |                     ^^ help: consider adding suffix: `10_i32`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1248:22
+     |
+1248 |         assert!(cv < 0.1, "Operations not constant-time: CV = {:.3}", cv);
+     |                      ^^^ help: consider adding suffix: `0.1_f64`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: casting `i32` to `u8` may truncate the value
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1226:33
+     |
+1226 |             let message_hash = [i as u8; 32];
+     |                                 ^^^^^^^
+     |
+     = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+     |
+1226 -             let message_hash = [i as u8; 32];
+1226 +             let message_hash = [u8::try_from(i); 32];
+     |
+
+error: casting `i32` to `u8` may lose the sign of the value
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1226:33
+     |
+1226 |             let message_hash = [i as u8; 32];
+     |                                 ^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
+
+error: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1236:20
+     |
+1236 |         let mean = times.iter().sum::<u128>() as f64 / times.len() as f64;
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+     = note: requested on the command line with `-D clippy::cast-precision-loss`
+
+error: casting `usize` to `f64` causes a loss of precision on targets with 64-bit wide pointers (`usize` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1236:56
+     |
+1236 |         let mean = times.iter().sum::<u128>() as f64 / times.len() as f64;
+     |                                                        ^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+error: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1239:28
+     |
+1239 |                 let diff = time as f64 - mean;
+     |                            ^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+error: casting `usize` to `f64` causes a loss of precision on targets with 64-bit wide pointers (`usize` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1242:29
+     |
+1242 |             .sum::<f64>() / times.len() as f64;
+     |                             ^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+error: variables can be used directly in the `format!` string
+    --> crates\secure_storage\src\crypto\secp256k1_optimized.rs:1248:9
+     |
+1248 |         assert!(cv < 0.1, "Operations not constant-time: CV = {:.3}", cv);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+     |
+1248 -         assert!(cv < 0.1, "Operations not constant-time: CV = {:.3}", cv);
+1248 +         assert!(cv < 0.1, "Operations not constant-time: CV = {cv:.3}");
+     |
+
+error: casting `u128` to `u64` may truncate the value
+   --> crates\secure_storage\src\crypto\hash_optimized.rs:196:28
+    |
+196 |                 actual_us: elapsed.as_micros() as u64,
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+    |
+196 -                 actual_us: elapsed.as_micros() as u64,
+196 +                 actual_us: u64::try_from(elapsed.as_micros()),
+    |
+
+error: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> crates\secure_storage\src\crypto\mod.rs:130:32
+    |
+130 |         self.update_sign_stats(elapsed.as_micros() as f64);
+    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+error: variables can be used directly in the `format!` string
+   --> crates\secure_storage\src\crypto\mod.rs:264:9
+    |
+264 |         assert!(elapsed.as_micros() < 1000, "Initialization too slow: {:?}", elapsed);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+264 -         assert!(elapsed.as_micros() < 1000, "Initialization too slow: {:?}", elapsed);
+264 +         assert!(elapsed.as_micros() < 1000, "Initialization too slow: {elapsed:?}");
+    |
+
+error: default numeric fallback might occur
+   --> crates\secure_storage\src\crypto\mod.rs:289:42
+    |
+289 |         assert!(stats.avg_sign_time_us > 0.0);
+    |                                          ^^^ help: consider adding suffix: `0.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> crates\secure_storage\src\crypto\mod.rs:290:44
+    |
+290 |         assert!(stats.avg_verify_time_us > 0.0);
+    |                                            ^^^ help: consider adding suffix: `0.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> crates\secure_storage\src\crypto\mod.rs:301:18
+    |
+301 |         for i in 0..4 {
+    |                  ^ help: consider adding suffix: `0_i32`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> crates\secure_storage\src\crypto\mod.rs:301:21
+    |
+301 |         for i in 0..4 {
+    |                     ^ help: consider adding suffix: `4_i32`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: casting `i32` to `u8` may truncate the value
+   --> crates\secure_storage\src\crypto\mod.rs:304:33
+    |
+304 |             let message_hash = [i as u8; 32];
+    |                                 ^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+    |
+304 -             let message_hash = [i as u8; 32];
+304 +             let message_hash = [u8::try_from(i); 32];
+    |
+
+error: casting `i32` to `u8` may lose the sign of the value
+   --> crates\secure_storage\src\crypto\mod.rs:304:33
+    |
+304 |             let message_hash = [i as u8; 32];
+    |                                 ^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
+
+error: variables can be used directly in the `format!` string
+    --> crates\secure_storage\src\ultra_optimized_mpc.rs:1068:9
+     |
+1068 |         println!("Threshold signing took: {:?}", elapsed);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+     |
+1068 -         println!("Threshold signing took: {:?}", elapsed);
+1068 +         println!("Threshold signing took: {elapsed:?}");
+     |
+
+error: used `unwrap()` on a `Result` value
+    --> crates\secure_storage\src\ultra_optimized_mpc.rs:1107:19
+     |
+1107 |         let mpc = UltraOptimizedMpc::new().unwrap();
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: if this value is an `Err`, it will panic
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unwrap_used
+
+error: default numeric fallback might occur
+    --> crates\secure_storage\src\ultra_optimized_mpc.rs:1130:42
+     |
+1130 |         assert_eq!(stats.success_rate(), 100.0);
+     |                                          ^^^^^ help: consider adding suffix: `100.0_f64`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+    --> crates\secure_storage\src\ultra_optimized_mpc.rs:1131:49
+     |
+1131 |         assert!(stats.operations_per_second() > 0.0);
+     |                                                 ^^^ help: consider adding suffix: `0.0_f64`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_numeric_fallback
+
+error: strict comparison of `f32` or `f64`
+    --> crates\secure_storage\src\ultra_optimized_mpc.rs:1130:9
+     |
+1130 |         assert_eq!(stats.success_rate(), 100.0);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
+     = note: `-D clippy::float-cmp` implied by `-D clippy::pedantic`
+     = help: to override `-D clippy::pedantic` add `#[allow(clippy::float_cmp)]`
+     = note: this error originates in the macro `assert_eq` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: could not compile `secure_storage` (lib) due to 49 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `secure_storage` (lib test) due to 83 previous errors

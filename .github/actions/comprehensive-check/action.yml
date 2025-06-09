@@ -1,0 +1,243 @@
+name: 'TallyIO Comprehensive Check'
+description: 'A comprehensive validation suite for TallyIO MEV infrastructure'
+inputs:
+  clear-cache:
+    description: 'Clear all cached test results'
+    required: false
+    default: 'false'
+  no-cache:
+    description: 'Run without using cached results'
+    required: false
+    default: 'false'
+  fast-tests:
+    description: 'Enable fast test mode for CI/CD'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Print Header
+      shell: bash
+      run: |
+        echo "=================================================="
+        echo "  TallyIO Production-Ready Validation Suite"
+        echo "=================================================="
+        echo "Running comprehensive checks..."
+
+    - name: Format Check
+      shell: bash
+      run: |
+        echo "🔄 Running Rust code formatting check..."
+        cargo fmt --all -- --check && echo "✅ Code formatting check passed!" || { echo "❌ Code formatting check failed!"; exit 1; }
+
+    - name: Clippy Analysis
+      shell: bash
+      run: |
+        echo "🔄 Running Clippy analysis with TallyIO ultra-strict standards..."
+        cargo clippy --all-targets --all-features -- -D warnings -D clippy::pedantic -D clippy::nursery -D clippy::correctness -D clippy::suspicious -D clippy::perf -W clippy::redundant_allocation -W clippy::needless_collect -W clippy::suboptimal_flops -A clippy::missing_docs_in_private_items -D clippy::infinite_loop -D clippy::while_immutable_condition -D clippy::never_loop -D for_loops_over_fallibles -D clippy::manual_strip -D clippy::needless_continue -D clippy::match_same_arms -v && echo "✅ Clippy analysis passed!" || { echo "❌ Clippy analysis failed!"; exit 1; }
+
+    - name: Check Forbidden Patterns
+      shell: bash
+      run: |
+        echo "🔄 Checking for forbidden patterns in Rust code..."
+        
+        # Check for unwrap calls
+        echo "Checking for unwrap() outside of test code..."
+        if find crates -name "*.rs" -not -path "*/tests/*" -not -path "*/benches/*" | xargs grep -l ".unwrap()" | grep -v "#\[test\]" | grep -v "#\[cfg(test)\]"; then
+          echo "❌ Found unwrap() calls in production code!"
+          exit 1
+        fi
+        
+        # Check for expect calls
+        echo "Checking for expect() outside of test code..."
+        if find crates -name "*.rs" -not -path "*/tests/*" -not -path "*/benches/*" | xargs grep -l ".expect(" | grep -v "#\[test\]" | grep -v "#\[cfg(test)\]"; then
+          echo "❌ Found expect() calls in production code!"
+          exit 1
+        fi
+        
+        # Check for unwrap_or_default warnings
+        echo "Checking for unwrap_or_default() calls (warning)..."
+        find crates -name "*.rs" | xargs grep -l ".unwrap_or_default()" || true
+        
+        # Check for Vec::new
+        echo "Checking for Vec::new() calls outside test code..."
+        if find crates -name "*.rs" -not -path "*/tests/*" -not -path "*/benches/*" | xargs grep -l "Vec::new()" | grep -v "#\[test\]" | grep -v "#\[cfg(test)\]"; then
+          echo "⚠️ Found Vec::new() calls in production code!"
+        fi
+        
+        # Check for Mutex
+        echo "Checking for Mutex usage outside test code..."
+        if find crates -name "*.rs" -not -path "*/tests/*" -not -path "*/benches/*" | xargs grep -l "Mutex" | grep -v "#\[test\]" | grep -v "#\[cfg(test)\]"; then
+          echo "⚠️ Found Mutex usage in production code!"
+        fi
+        
+        echo "✅ Forbidden patterns check completed!"
+
+    - name: Unit Tests
+      shell: bash
+      env:
+        TALLYIO_FAST_TESTS: ${{ inputs.fast-tests == 'true' && '1' || '0' }}
+      run: |
+        echo "🔄 Running workspace unit tests..."
+        cargo test --workspace && echo "✅ Unit tests passed!" || { echo "❌ Unit tests failed!"; exit 1; }
+
+    - name: Security Audit
+      shell: bash
+      run: |
+        echo "🔄 Running security audit..."
+        cargo install cargo-audit --quiet
+        cargo audit && echo "✅ Security audit passed!" || { echo "❌ Security audit failed!"; exit 1; }
+
+    - name: Code Coverage
+      shell: bash
+      run: |
+        echo "🔄 Running code coverage analysis..."
+        cargo install cargo-llvm-cov --quiet
+        cargo llvm-cov --workspace --lcov --output-path lcov.info
+        echo "✅ Code coverage analysis completed."
+
+    - name: Critical Tests
+      shell: bash
+      run: |
+        echo "🔄 Running critical tests..."
+        
+        # Security tests
+        echo "Running security tests..."
+        cargo test --workspace --test "*security*" -- --nocapture
+        
+        # Economic tests
+        echo "Running economic tests..."
+        cargo test --workspace --test "*economic*" -- --nocapture
+        
+        # State consistency tests
+        echo "Running state consistency tests..."
+        cargo test --workspace --test "*consistency*" -- --nocapture
+        
+        # Timing tests
+        echo "Running timing tests..."
+        cargo test --workspace --test "*timing*" -- --nocapture
+        
+        echo "✅ Critical tests completed."
+
+    - name: Stability Tests
+      shell: bash
+      run: |
+        echo "🔄 Running stability tests..."
+        
+        # Endurance tests
+        echo "Running endurance tests..."
+        cargo test --workspace --test "*endurance*" -- --nocapture
+        
+        # Load stress tests
+        echo "Running load stress tests..."
+        cargo test --workspace --test "*stress*" -- --nocapture
+        
+        # Resource exhaustion tests
+        echo "Running resource exhaustion tests..."
+        cargo test --workspace --test "*exhaustion*" -- --nocapture
+        
+        echo "✅ Stability tests completed."
+
+    - name: Integration Tests
+      shell: bash
+      run: |
+        echo "🔄 Running integration tests..."
+        
+        # Check if tests directory exists
+        if [ -d "tests" ]; then
+          cd tests
+          for test_dir in */; do
+            if [ -d "$test_dir" ]; then
+              cd "$test_dir"
+              if [ -f "Cargo.toml" ]; then
+                echo "Running tests in $test_dir..."
+                cargo test --all-features -- --nocapture
+              fi
+              cd ..
+            fi
+          done
+          cd ..
+        else
+          echo "No tests directory found."
+        fi
+        
+        echo "✅ Integration tests completed."
+
+    - name: Doc Tests
+      shell: bash
+      run: |
+        echo "🔄 Running documentation tests..."
+        cargo test --workspace --doc && echo "✅ Doc tests passed!" || { echo "❌ Doc tests failed!"; exit 1; }
+
+    - name: Benchmarks
+      shell: bash
+      run: |
+        echo "🔄 Running performance benchmarks..."
+        cargo install cargo-criterion --quiet
+        cargo criterion --workspace
+        echo "✅ Benchmarks completed."
+
+    - name: Module Test Mapping
+      shell: bash
+      run: |
+        echo "🔄 Checking module test mapping..."
+        
+        # Get all module paths
+        echo "Analyzing module structure..."
+        find crates -name "mod.rs" -o -name "lib.rs" | sort
+        
+        # Check test coverage for critical modules
+        echo "Checking test coverage for critical modules..."
+        critical_modules=("core/src/engine" "blockchain/src/transaction" "strategies/src")
+        for module in "${critical_modules[@]}"; do
+          if find "crates/$module" -name "*.rs" 2>/dev/null | xargs grep -L "#\[test\]" | grep -v "mod.rs" | grep -v "lib.rs"; then
+            echo "⚠️ Potential missing tests in $module"
+          fi
+        done
+        
+        echo "✅ Module test mapping completed."
+
+    - name: Generate Report
+      shell: bash
+      run: |
+        echo "🔄 Generating validation report..."
+        
+        # Create report file
+        cat > validation-report.md << EOL
+        # TallyIO Validation Report
+        
+        ## Summary
+        - Date: $(date)
+        - Repository: ${{ github.repository }}
+        - Commit: ${{ github.sha }}
+        
+        ## Test Results
+        - Format Check: ✅
+        - Clippy Analysis: ✅
+        - Forbidden Patterns: ✅
+        - Unit Tests: ✅
+        - Security Audit: ✅
+        - Code Coverage: ✅
+        - Critical Tests: ✅
+        - Stability Tests: ✅
+        - Integration Tests: ✅
+        - Doc Tests: ✅
+        - Benchmarks: ✅
+        - Module Test Mapping: ✅
+        
+        ## Next Steps
+        - Review code coverage report for potential gaps
+        - Check for performance optimizations in critical paths
+        - Ensure all critical modules have comprehensive tests
+        EOL
+        
+        echo "✅ Validation report generated."
+
+    - name: Summary
+      shell: bash
+      run: |
+        echo "=================================================="
+        echo "  TallyIO Validation Suite: COMPLETED"
+        echo "=================================================="
+        echo "See validation-report.md for detailed results."

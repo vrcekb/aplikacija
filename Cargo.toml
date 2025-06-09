@@ -1,0 +1,129 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    # "crates/blockchain",     # Temporarily disabled - will be created
+    # "crates/strategies",     # Temporarily disabled - will be created
+    # "crates/risk",           # Temporarily disabled - will be created
+    # "crates/simulator",      # Temporarily disabled - will be created
+    # "crates/wallet",         # Temporarily disabled - will be created
+    "crates/network",
+    # "crates/tallyio_metrics", # Temporarily disabled - will be created
+    # "crates/data",           # Temporarily disabled - will be created
+    # "crates/ml",             # Temporarily disabled - will be created
+    # "crates/api",            # Temporarily disabled - will be created
+    # "crates/cli",            # Temporarily disabled - will be created
+    # "crates/cross_chain",    # Temporarily disabled - will be created
+    "crates/data_storage",
+    "crates/secure_storage",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["TallyIO Team"]
+license = "MIT"
+repository = "https://github.com/vrcekb/tallyio"
+homepage = "https://tallyio.dev"
+description = "Ultra-performant MEV/DeFi trading platform with <1ms latency"
+keywords = ["mev", "defi", "trading", "blockchain", "ethereum"]
+categories = ["finance", "cryptography", "network-programming"]
+
+[workspace.dependencies]
+# Core dependencies
+tokio = { version = "1.35", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Performance & Concurrency
+dashmap = "5.5"
+crossbeam = "0.8"
+rayon = "1.8"
+parking_lot = "0.12"
+
+# Networking
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+tungstenite = "0.21"
+tokio-tungstenite = "0.21"
+
+# Database (PostgreSQL + SQLite only - NO MySQL for security)
+sqlx = { version = "0.7", default-features = false, features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "chrono",
+    "uuid",
+    "macros",
+    "migrate"
+] }
+redb = "1.5"  # Embedded database for hot path
+redis = { version = "0.24", features = ["tokio-comp"] }
+rusqlite = { version = "0.31", features = ["bundled", "chrono", "serde_json"] }
+
+# Cryptography & Security
+# ring = "0.17"  # Disabled due to Windows MSVC compatibility (uses .S assembly files)
+argon2 = "0.5"
+aes-gcm = "0.10"
+rand = "0.8"
+zeroize = { version = "1.7", features = ["zeroize_derive"] }
+
+# Validation (modern alternative to validator)
+garde = { version = "0.18", features = ["derive"] }
+
+# Blockchain
+ethers = { version = "2.0", features = ["rustls"] }
+solana-client = "1.17"
+web3 = { version = "0.19", features = ["rustls-tls"] }
+
+# Metrics & Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+metrics = "0.22"
+metrics-exporter-prometheus = "0.13"
+
+# Configuration
+config = "0.14"
+toml = "0.8"
+
+# Testing
+mockall = "0.12"
+proptest = "1.4"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+# Development tools
+cargo-audit = "0.18"
+
+[profile.dev]
+opt-level = 1
+debug = true
+overflow-checks = true
+
+[profile.release]
+opt-level = 3
+debug = false
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+overflow-checks = false
+
+[profile.bench]
+opt-level = 3
+debug = false
+lto = "fat"
+codegen-units = 1
+
+# Production profile for ultra-performance
+[profile.production]
+inherits = "release"
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

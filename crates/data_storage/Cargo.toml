@@ -1,0 +1,113 @@
+[package]
+name = "tallyio-data-storage"
+version = "0.1.0"
+edition = "2021"
+authors = ["TallyIO Team"]
+license = "MIT"
+repository = "https://github.com/vrcekb/tallyio"
+description = "Ultra-performant data storage layer for TallyIO MEV/DeFi platform"
+keywords = ["mev", "defi", "database", "storage", "performance"]
+categories = ["finance", "database", "caching"]
+
+[lib]
+name = "tallyio_data_storage"
+crate-type = ["lib"]
+
+[dependencies]
+# Workspace dependencies
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+dashmap = { workspace = true }
+crossbeam = { workspace = true }
+rayon = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+garde = { workspace = true }
+
+# Database dependencies - Hybrid Architecture
+# Primary database: PostgreSQL for secure, persistent data
+tokio-postgres = { version = "0.7", optional = true }
+deadpool-postgres = { version = "0.12", optional = true }
+postgres-types = { version = "0.2", features = ["derive"], optional = true }
+refinery = { version = "0.8", features = ["tokio-postgres"], optional = true }
+
+# Hot storage: redb for ultra-fast local operations (<1ms)
+redb = { workspace = true, optional = true }
+
+# Cache layer: Redis for fast access
+redis = { workspace = true, optional = true }
+deadpool-redis = { version = "0.14", optional = true }
+lru = { version = "0.12", optional = true }
+
+# Performance dependencies
+crossbeam-deque = "0.8"
+fastrand = "2.0"
+thread_local = "1.1"
+
+# Ultra-performance optimizations
+crossbeam-queue = "0.3"
+crossbeam-channel = "0.5"
+
+# Memory management and allocators
+bumpalo = "3.16"
+typed-arena = "2.0"
+
+# Lock-free data structures
+lockfree = "0.5"
+flurry = "0.5"
+
+# CPU affinity (Windows compatible)
+core_affinity = { version = "0.8", optional = true }
+
+# SIMD optimizations
+wide = { version = "0.7", optional = true }
+
+# Custom allocators (Windows compatible)
+mimalloc = { version = "0.1", optional = true }
+
+# Metrics
+metrics = { workspace = true, optional = true }
+
+# Configuration
+config = { workspace = true }
+toml = { workspace = true }
+
+# Additional dependencies
+hex = "0.4"
+bytes = "1.5"
+lz4 = { version = "1.24", optional = true }  # Compression for cold storage
+num_cpus = "1.16"  # For worker thread configuration
+regex = "1.10"  # For validation patterns
+
+[dev-dependencies]
+mockall = { workspace = true }
+proptest = { workspace = true }
+criterion = { workspace = true }
+tokio-test = "0.4"
+tempfile = "3.8"
+
+[features]
+default = ["hot-storage", "cache"]
+test-mode = ["hot-storage", "cache"]
+hot-storage = ["dep:redb"]
+warm-storage = ["dep:tokio-postgres", "dep:deadpool-postgres", "dep:postgres-types", "dep:refinery"]
+cold-storage = ["dep:lz4"]
+cache = ["dep:redis", "dep:deadpool-redis", "dep:lru"]
+metrics = ["dep:metrics"]
+
+# Performance optimization features (Windows compatible)
+mimalloc-allocator = ["dep:mimalloc"]
+cpu-affinity = ["dep:core_affinity"]
+simd-optimizations = ["dep:wide"]
+ultra-performance = ["simd-optimizations", "mimalloc-allocator", "cpu-affinity"]
+
+[[bench]]
+name = "storage_bench"
+harness = false
