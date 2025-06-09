@@ -10,7 +10,7 @@ use crate::load_balancer::{LoadBalancer, LoadBalancerTrait};
 use crate::metrics::NetworkMetrics;
 use crate::p2p::{P2PNetwork, P2PNetworkTrait};
 use crate::types::{ConnectionId, Endpoint, HttpRequest, HttpResponse, WebSocketMessage};
-use crate::websocket::{WebSocketClient, WebSocketClientTrait};
+use crate::websocket::{WebSocketClient as WsClient, WebSocketClientTrait};
 use std::sync::Arc;
 use tallyio_core::prelude::*;
 use tracing::{debug, error, info, instrument, warn};
@@ -22,7 +22,7 @@ pub struct NetworkManager {
     /// HTTP client
     http_client: Arc<HttpClient>,
     /// WebSocket client
-    websocket_client: Arc<WebSocketClient>,
+    websocket_client: Arc<WebSocketClientStub>,
     /// Load balancer
     load_balancer: Arc<LoadBalancer>,
     /// P2P network (optional)
@@ -56,7 +56,7 @@ impl NetworkManager {
         debug!("HTTP client initialized");
 
         // Initialize WebSocket client (stub for now)
-        let websocket_client = Arc::new(WebSocketClient::new(config.websocket.clone()).map_err(|e| {
+        let websocket_client = Arc::new(WebSocketClientStub::new(config.websocket.clone()).map_err(|e| {
             error!("Failed to initialize WebSocket client: {}", e);
             e
         })?);
@@ -104,7 +104,7 @@ impl NetworkManager {
     }
 
     /// Get WebSocket client
-    pub fn websocket_client(&self) -> &Arc<WebSocketClient> {
+    pub fn websocket_client(&self) -> &Arc<WebSocketClientStub> {
         &self.websocket_client
     }
 
@@ -371,11 +371,11 @@ pub struct NetworkStats {
 }
 
 // Stub implementations for WebSocketClient
-pub struct WebSocketClient {
+pub struct WebSocketClientStub {
     _config: crate::config::WebSocketConfig,
 }
 
-impl WebSocketClient {
+impl WebSocketClientStub {
     pub fn new(config: crate::config::WebSocketConfig) -> NetworkResult<Self> {
         Ok(Self { _config: config })
     }
@@ -390,7 +390,7 @@ impl WebSocketClient {
 }
 
 #[async_trait]
-impl WebSocketClientTrait for WebSocketClient {
+impl WebSocketClientTrait for WebSocketClientStub {
     async fn connect(&self, _url: &str) -> NetworkResult<ConnectionId> {
         Ok(ConnectionId::new())
     }

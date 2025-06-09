@@ -42,7 +42,9 @@
 //! | Decryption (1KB) | < 5ms | ✅ |
 //! | Vault operations | < 20ms | ✅ |
 
-#![deny(unsafe_code)]
+// Note: unsafe code is required for low-level memory operations (mlock, mprotect, etc.)
+// All unsafe blocks are documented with safety requirements and justification
+#![allow(unsafe_code)]
 #![warn(
     missing_docs,
     rust_2018_idioms,

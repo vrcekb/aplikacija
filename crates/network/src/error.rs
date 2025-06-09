@@ -27,7 +27,7 @@ pub enum CriticalNetworkError {
 }
 
 /// Main error type for network operations
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum NetworkError {
     /// Critical network error (requires immediate action)
     #[error("Critical network error: {0:?}")]
@@ -149,16 +149,25 @@ pub enum NetworkError {
     },
 
     /// I/O errors
-    #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("I/O error: {message}")]
+    Io {
+        /// Error message
+        message: String,
+    },
 
     /// JSON errors
-    #[error("JSON error: {0}")]
-    Json(#[from] serde_json::Error),
+    #[error("JSON error: {message}")]
+    Json {
+        /// Error message
+        message: String,
+    },
 
     /// URL parsing errors
-    #[error("URL parsing error: {0}")]
-    UrlParse(#[from] url::ParseError),
+    #[error("URL parsing error: {message}")]
+    UrlParse {
+        /// Error message
+        message: String,
+    },
 
     /// Generic internal error (use sparingly)
     #[error("Internal network error: {message}")]

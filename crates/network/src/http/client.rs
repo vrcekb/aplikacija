@@ -5,7 +5,8 @@
 
 use crate::config::HttpConfig;
 use crate::error::{NetworkError, NetworkResult};
-use crate::http::{CircuitBreaker, CircuitBreakerConfig, HttpClientTrait, RetryPolicy};
+use crate::http::{CircuitBreaker, HttpClientTrait, RetryPolicy};
+use crate::http::circuit_breaker::CircuitBreakerConfig;
 use crate::types::{HttpRequest, HttpResponse, HttpMethod};
 use async_trait::async_trait;
 use dashmap::DashMap;

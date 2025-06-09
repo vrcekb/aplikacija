@@ -24,6 +24,12 @@ pub enum CriticalError {
     /// System limit exceeded
     #[error("System limit exceeded: code {0}")]
     SystemLimitExceeded(u16),
+    /// Invalid size parameter
+    #[error("Invalid size: code {0}")]
+    InvalidSize(u16),
+    /// System error
+    #[error("System error: code {0}")]
+    SystemError(u16),
 }
 
 /// Main error type for core operations
@@ -115,6 +121,34 @@ pub enum CoreError {
     /// Generic internal error (use sparingly)
     #[error("Internal error: {message}")]
     Internal {
+        /// Error message
+        message: String,
+    },
+
+    /// System error
+    #[error("System error: {message}")]
+    SystemError {
+        /// Error message
+        message: String,
+    },
+
+    /// Invalid size error
+    #[error("Invalid size: {message}")]
+    InvalidSize {
+        /// Error message
+        message: String,
+    },
+
+    /// Out of memory error
+    #[error("Out of memory: {message}")]
+    OutOfMemory {
+        /// Error message
+        message: String,
+    },
+
+    /// Invalid configuration error
+    #[error("Invalid configuration: {message}")]
+    InvalidConfiguration {
         /// Error message
         message: String,
     },
@@ -326,6 +360,34 @@ impl CoreError {
     /// Create internal error (use sparingly)
     pub fn internal(message: impl Into<String>) -> Self {
         Self::Internal {
+            message: message.into(),
+        }
+    }
+
+    /// Create system error
+    pub fn system_error(message: impl Into<String>) -> Self {
+        Self::SystemError {
+            message: message.into(),
+        }
+    }
+
+    /// Create invalid size error
+    pub fn invalid_size(message: impl Into<String>) -> Self {
+        Self::InvalidSize {
+            message: message.into(),
+        }
+    }
+
+    /// Create out of memory error
+    pub fn out_of_memory(message: impl Into<String>) -> Self {
+        Self::OutOfMemory {
+            message: message.into(),
+        }
+    }
+
+    /// Create invalid configuration error
+    pub fn invalid_configuration(message: impl Into<String>) -> Self {
+        Self::InvalidConfiguration {
             message: message.into(),
         }
     }

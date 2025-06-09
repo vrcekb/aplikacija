@@ -571,11 +571,10 @@ impl NumaScheduler {
                 let name = entry.file_name();
                 let name_str = name.to_string_lossy();
 
-                if name_str.starts_with("node") {
-                    if let Ok(node_id) = name_str[4..].parse::<usize>() {
-                        if let Some(node) = Self::parse_numa_node(node_id) {
-                            nodes.push(node);
-                        }
+                if let Some(stripped) = name_str.strip_prefix("node") {
+                    if let Ok(node_id) = stripped.parse::<usize>() {
+                        let node = Self::parse_numa_node(node_id);
+                        nodes.push(node);
                     }
                 }
             }
@@ -597,32 +596,26 @@ impl NumaScheduler {
     }
 
     #[cfg(target_os = "linux")]
-    fn parse_numa_node(node_id: usize) -> Option<NumaNode> {
+    fn parse_numa_node(node_id: usize) -> NumaNode {
         use std::fs;
 
         let cpulist_path = format!("/sys/devices/system/node/node{node_id}/cpulist");
         let meminfo_path = format!("/sys/devices/system/node/node{node_id}/meminfo");
 
-        let cores = if let Ok(cpulist) = fs::read_to_string(cpulist_path) {
-            Self::parse_cpulist(cpulist.trim())
-        } else {
-            Vec::new()
-        };
+        let cores = fs::read_to_string(cpulist_path)
+            .map_or_else(|_| Vec::new(), |cpulist| Self::parse_cpulist(cpulist.trim()));
 
-        let memory_gb = if let Ok(meminfo) = fs::read_to_string(meminfo_path) {
-            Self::parse_memory_info(&meminfo)
-        } else {
-            4 // Default 4GB
-        };
+        let memory_gb = fs::read_to_string(meminfo_path)
+            .map_or(4, |meminfo| Self::parse_memory_info(&meminfo));
 
-        Some(NumaNode {
+        NumaNode {
             id: node_id,
             cores,
             memory_gb,
             load: 0.0,
             avg_latency_ns: 0,
             active_tasks: 0,
-        })
+        }
     }
 
     #[cfg(target_os = "linux")]

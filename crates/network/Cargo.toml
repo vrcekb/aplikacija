@@ -30,7 +30,7 @@ crossbeam = { workspace = true }
 parking_lot = { workspace = true }
 
 # Networking - HTTP
-reqwest = { workspace = true, features = ["http2", "stream", "gzip", "brotli"] }
+reqwest = { workspace = true, features = ["stream", "gzip", "brotli"] }
 hyper = { version = "1.0", features = ["full"] }
 hyper-util = { version = "0.1", features = ["full"] }
 http = "1.0"
@@ -58,6 +58,7 @@ garde = { workspace = true }
 # Utilities
 bytes = "1.5"
 pin-project-lite = "0.2"
+rand = "0.8"
 
 # Internal dependencies
 tallyio-core = { path = "../core" }
@@ -73,7 +74,7 @@ wiremock = "0.6"
 [features]
 default = ["http2", "websocket", "load-balancer"]
 http2 = []
-http3 = ["reqwest/http3"]
+# http3 = ["reqwest/http3"]  # Disabled due to unstable feature requirement
 websocket = []
 p2p = []
 load-balancer = []

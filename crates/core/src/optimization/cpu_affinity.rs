@@ -209,7 +209,7 @@ impl CpuAffinityManager {
             let param = sched_param { sched_priority: 50 }; // High but not max priority
 
             unsafe {
-                if sched_setscheduler(0, SCHED_FIFO, &param) != 0 {
+                if sched_setscheduler(0, SCHED_FIFO, &param) != 0_i32 {
                     tracing::warn!(
                         "Failed to set thread priority - continuing without high priority"
                     );
