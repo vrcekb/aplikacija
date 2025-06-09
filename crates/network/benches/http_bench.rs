@@ -1,29 +1,12 @@
-//! HTTP Client Performance Benchmarks
-//!
-//! Ultra-low latency HTTP benchmarks for TallyIO financial application.
-//! Target: <1ms latency for critical operations.
+//! HTTP Performance Benchmarks
+//! 
+//! Ultra-low latency HTTP benchmarks for `TallyIO` financial application.
+//! Target: <1ms latency for critical real-time operations.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
 use std::{sync::Arc, time::Duration};
 use tokio::runtime::Runtime;
 use tallyio_network::prelude::*;
-
-/// Benchmark configuration for HTTP operations
-struct BenchConfig {
-    pub concurrent_requests: usize,
-    pub request_size: usize,
-    pub timeout_ms: u64,
-}
-
-impl Default for BenchConfig {
-    fn default() -> Self {
-        Self {
-            concurrent_requests: 100,
-            request_size: 1024,
-            timeout_ms: 1,
-        }
-    }
-}
 
 /// Setup HTTP client for benchmarks
 fn setup_http_client() -> NetworkResult<Arc<HttpClient>> {
@@ -35,24 +18,44 @@ fn setup_http_client() -> NetworkResult<Arc<HttpClient>> {
         enable_http3: false,
         ..HttpConfig::default()
     };
-
+    
     HttpClient::new(config).map(Arc::new)
 }
 
-/// Benchmark single HTTP GET request
-fn bench_single_get_request(c: &mut Criterion) {
-    let rt = Runtime::new().map_err(|e| format!("Failed to create runtime: {e}")).unwrap();
-    let client = rt.block_on(async {
-        setup_http_client().map_err(|e| format!("Failed to setup client: {e}")).unwrap()
+/// Benchmark single HTTP request latency
+fn bench_request_latency(c: &mut Criterion) {
+    let rt = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("Failed to create runtime: {e}");
+            return;
+        }
+    };
+    let client = rt.block_on(async { 
+        match setup_http_client() {
+            Ok(client) => client,
+            Err(e) => {
+                eprintln!("Failed to setup client: {e}");
+                Arc::new(HttpClient::new(HttpConfig::default()).unwrap_or_else(|_| {
+                    // This should never happen with default config
+                    eprintln!("Failed to create default HTTP client");
+                    std::process::exit(1);
+                }))
+            }
+        }
     });
-
-    c.bench_function("http_single_get", |b| {
+    
+    c.bench_function("http_request_latency", |b| {
         b.iter(|| {
             rt.block_on(async {
+                let start = std::time::Instant::now();
+                
                 let result = HttpRequestBuilder::new(HttpMethod::Get, "https://httpbin.org/get")
                     .timeout(Duration::from_millis(1))
                     .send(client.as_ref()).await;
-                black_box(result)
+                let elapsed = start.elapsed();
+                
+                black_box((result, elapsed))
             })
         });
     });
@@ -60,38 +63,52 @@ fn bench_single_get_request(c: &mut Criterion) {
 
 /// Benchmark concurrent HTTP requests
 fn bench_concurrent_requests(c: &mut Criterion) {
-    let rt = Runtime::new().map_err(|e| format!("Failed to create runtime: {e}")).unwrap();
-    let client = rt.block_on(async {
-        setup_http_client().map_err(|e| format!("Failed to setup client: {e}")).unwrap()
+    let rt = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("Failed to create runtime: {e}");
+            return;
+        }
+    };
+    let client = rt.block_on(async { 
+        match setup_http_client() {
+            Ok(client) => client,
+            Err(e) => {
+                eprintln!("Failed to setup client: {e}");
+                Arc::new(HttpClient::new(HttpConfig::default()).unwrap_or_else(|_| {
+                    eprintln!("Failed to create default HTTP client");
+                    std::process::exit(1);
+                }))
+            }
+        }
     });
-
-    let configs = vec![
-        BenchConfig { concurrent_requests: 10, ..BenchConfig::default() },
-        BenchConfig { concurrent_requests: 50, ..BenchConfig::default() },
-        BenchConfig { concurrent_requests: 100, ..BenchConfig::default() },
-    ];
-
-    for config in configs {
+    
+    let concurrent_counts = vec![10, 50, 100];
+    
+    for count in concurrent_counts {
         c.bench_with_input(
-            BenchmarkId::new("http_concurrent", config.concurrent_requests),
-            &config,
-            |b, config| {
+            BenchmarkId::new("http_concurrent_requests", count),
+            &count,
+            |b, &count| {
                 b.iter(|| {
                     rt.block_on(async {
-                        let mut handles = Vec::with_capacity(config.concurrent_requests);
-
-                        for _ in 0..config.concurrent_requests {
+                        let mut handles = Vec::with_capacity(count);
+                        let start = std::time::Instant::now();
+                        
+                        for _ in 0_i32..count.try_into().unwrap_or(i32::MAX) {
                             let client = Arc::clone(&client);
                             let handle = tokio::spawn(async move {
                                 HttpRequestBuilder::new(HttpMethod::Get, "https://httpbin.org/get")
-                                    .timeout(Duration::from_millis(config.timeout_ms))
+                                    .timeout(Duration::from_millis(1))
                                     .send(client.as_ref()).await
                             });
                             handles.push(handle);
                         }
-
+                        
                         let results = futures::future::join_all(handles).await;
-                        black_box(results)
+                        let elapsed = start.elapsed();
+                        
+                        black_box((results, elapsed))
                     })
                 });
             },
@@ -99,15 +116,30 @@ fn bench_concurrent_requests(c: &mut Criterion) {
     }
 }
 
-/// Benchmark HTTP POST with payload
-fn bench_post_with_payload(c: &mut Criterion) {
-    let rt = Runtime::new().map_err(|e| format!("Failed to create runtime: {e}")).unwrap();
-    let client = rt.block_on(async {
-        setup_http_client().map_err(|e| format!("Failed to setup client: {e}")).unwrap()
+/// Benchmark POST request with different payload sizes
+fn bench_post_payload_sizes(c: &mut Criterion) {
+    let rt = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("Failed to create runtime: {e}");
+            return;
+        }
+    };
+    let client = rt.block_on(async { 
+        match setup_http_client() {
+            Ok(client) => client,
+            Err(e) => {
+                eprintln!("Failed to setup client: {e}");
+                Arc::new(HttpClient::new(HttpConfig::default()).unwrap_or_else(|_| {
+                    eprintln!("Failed to create default HTTP client");
+                    std::process::exit(1);
+                }))
+            }
+        }
     });
-
-    let payload_sizes = vec![256, 1024, 4096];
-
+    
+    let payload_sizes = vec![64, 256, 1024, 4096];
+    
     for size in payload_sizes {
         c.bench_with_input(
             BenchmarkId::new("http_post_payload", size),
@@ -130,17 +162,29 @@ fn bench_post_with_payload(c: &mut Criterion) {
 
 /// Benchmark connection pooling efficiency
 fn bench_connection_pooling(c: &mut Criterion) {
-    let rt = Runtime::new().map_err(|e| format!("Failed to create runtime: {e}")).unwrap();
-
+    let rt = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("Failed to create runtime: {e}");
+            return;
+        }
+    };
+    
     c.bench_function("http_connection_pooling", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let client = setup_http_client().map_err(|e| format!("Failed to setup client: {e}")).unwrap();
-
-                // Make multiple requests to same host to test pooling
+                let client = match setup_http_client() {
+                    Ok(client) => client,
+                    Err(e) => {
+                        eprintln!("Failed to setup client: {e}");
+                        return black_box((Vec::new(), std::time::Duration::ZERO));
+                    }
+                };
                 let mut handles = Vec::with_capacity(10);
-
-                for _ in 0..10 {
+                
+                let start = std::time::Instant::now();
+                
+                for _ in 0_i32..10_i32 {
                     let client = Arc::clone(&client);
                     let handle = tokio::spawn(async move {
                         HttpRequestBuilder::new(HttpMethod::Get, "https://httpbin.org/get")
@@ -149,9 +193,11 @@ fn bench_connection_pooling(c: &mut Criterion) {
                     });
                     handles.push(handle);
                 }
-
+                
                 let results = futures::future::join_all(handles).await;
-                black_box(results)
+                let elapsed = start.elapsed();
+                
+                black_box((results, elapsed))
             })
         });
     });
@@ -159,54 +205,84 @@ fn bench_connection_pooling(c: &mut Criterion) {
 
 /// Benchmark HTTP/2 multiplexing
 fn bench_http2_multiplexing(c: &mut Criterion) {
-    let rt = Runtime::new().map_err(|e| format!("Failed to create runtime: {e}")).unwrap();
-    let client = rt.block_on(async {
-        setup_http_client().map_err(|e| format!("Failed to setup client: {e}")).unwrap()
+    let rt = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("Failed to create runtime: {e}");
+            return;
+        }
+    };
+    let client = rt.block_on(async { 
+        match setup_http_client() {
+            Ok(client) => client,
+            Err(e) => {
+                eprintln!("Failed to setup client: {e}");
+                Arc::new(HttpClient::new(HttpConfig::default()).unwrap_or_else(|_| {
+                    eprintln!("Failed to create default HTTP client");
+                    std::process::exit(1);
+                }))
+            }
+        }
     });
-
+    
     c.bench_function("http2_multiplexing", |b| {
         b.iter(|| {
             rt.block_on(async {
-                // Send multiple requests simultaneously over same connection
-                let requests = (0..20).map(|i| {
+                let start = std::time::Instant::now();
+                
+                let requests = (0_i32..20_i32).map(|i| {
                     let client = Arc::clone(&client);
                     tokio::spawn(async move {
                         HttpRequestBuilder::new(
-                            HttpMethod::Get,
-                            &format!("https://httpbin.org/delay/{}", i % 3)
+                            HttpMethod::Get, 
+                            format!("https://httpbin.org/delay/{}", i % 3_i32)
                         )
                         .timeout(Duration::from_millis(1))
                         .send(client.as_ref()).await
                     })
                 }).collect::<Vec<_>>();
-
+                
                 let results = futures::future::join_all(requests).await;
-                black_box(results)
+                let elapsed = start.elapsed();
+                
+                black_box((results, elapsed))
             })
         });
     });
 }
 
-/// Benchmark latency measurement
+/// Benchmark latency measurement precision
 fn bench_latency_measurement(c: &mut Criterion) {
-    let rt = Runtime::new().map_err(|e| format!("Failed to create runtime: {e}")).unwrap();
-    let client = rt.block_on(async {
-        setup_http_client().map_err(|e| format!("Failed to setup client: {e}")).unwrap()
+    let rt = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("Failed to create runtime: {e}");
+            return;
+        }
+    };
+    let client = rt.block_on(async { 
+        match setup_http_client() {
+            Ok(client) => client,
+            Err(e) => {
+                eprintln!("Failed to setup client: {e}");
+                Arc::new(HttpClient::new(HttpConfig::default()).unwrap_or_else(|_| {
+                    eprintln!("Failed to create default HTTP client");
+                    std::process::exit(1);
+                }))
+            }
+        }
     });
-
-    c.bench_function("http_latency_critical", |b| {
+    
+    c.bench_function("http_latency_measurement", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let start = std::time::Instant::now();
-
+                
                 let result = HttpRequestBuilder::new(HttpMethod::Get, "https://httpbin.org/get")
                     .timeout(Duration::from_millis(1))
                     .send(client.as_ref()).await;
                 let elapsed = start.elapsed();
-
-                // Note: <1ms latency requirement for financial application
-                // In real benchmarks, this would be measured properly
-
+                
                 black_box((result, elapsed))
             })
         });
@@ -215,9 +291,9 @@ fn bench_latency_measurement(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    bench_single_get_request,
+    bench_request_latency,
     bench_concurrent_requests,
-    bench_post_with_payload,
+    bench_post_payload_sizes,
     bench_connection_pooling,
     bench_http2_multiplexing,
     bench_latency_measurement

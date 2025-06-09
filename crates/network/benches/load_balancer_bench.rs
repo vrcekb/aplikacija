@@ -1,67 +1,53 @@
 //! Load Balancer Performance Benchmarks
 //! 
-//! Ultra-low latency load balancer benchmarks for TallyIO financial application.
-//! Target: <1ms latency for critical load balancing decisions.
+//! Ultra-low latency load balancer benchmarks for `TallyIO` financial application.
+//! Target: <1ms latency for critical real-time operations.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use std::time::Duration;
 use tokio::runtime::Runtime;
 use tallyio_network::prelude::*;
 
-/// Benchmark configuration for load balancer operations
-struct BenchConfig {
-    pub endpoint_count: usize,
-    pub requests_per_second: usize,
-    pub health_check_interval: Duration,
-}
-
-impl Default for BenchConfig {
-    fn default() -> Self {
-        Self {
-            endpoint_count: 10,
-            requests_per_second: 10_000,
-            health_check_interval: Duration::from_millis(100),
-        }
-    }
-}
-
 /// Setup load balancer for benchmarks
 fn setup_load_balancer(endpoint_count: usize) -> LoadBalancer {
-    let endpoints = (0..endpoint_count)
+    let endpoints = (0_i32..endpoint_count.try_into().unwrap_or(i32::MAX))
         .map(|i| Endpoint {
-            url: format!("https://api{}.example.com", i),
+            url: format!("https://api{i}.example.com"),
             socket_addr: None,
             priority: 100,
             weight: 1,
             health_check: None,
         })
         .collect();
-
+    
     LoadBalancer::new(LoadBalancingStrategy::RoundRobin, endpoints)
 }
 
 /// Benchmark endpoint selection latency
 fn bench_endpoint_selection(c: &mut Criterion) {
-    let rt = Runtime::new().map_err(|e| format!("Failed to create runtime: {e}")).unwrap();
+    let rt = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("Failed to create runtime: {e}");
+            return;
+        }
+    };
     
-    let endpoint_counts = vec![5, 10, 50, 100];
+    let endpoint_counts = vec![5, 10, 20, 50];
     
     for count in endpoint_counts {
         c.bench_with_input(
             BenchmarkId::new("load_balancer_selection", count),
             &count,
             |b, &count| {
-                let load_balancer = setup_load_balancer(count);
-                
                 b.iter(|| {
                     rt.block_on(async {
+                        let load_balancer = setup_load_balancer(count);
                         let start = std::time::Instant::now();
                         
-                        let endpoint = load_balancer.select_endpoint().await;
-                        
+                        let result = load_balancer.select_endpoint().await;
                         let elapsed = start.elapsed();
                         
-                        black_box((endpoint, elapsed))
+                        black_box((result, elapsed))
                     })
                 });
             },
@@ -69,19 +55,25 @@ fn bench_endpoint_selection(c: &mut Criterion) {
     }
 }
 
-/// Benchmark round-robin strategy
-fn bench_round_robin_strategy(c: &mut Criterion) {
-    let rt = Runtime::new().map_err(|e| format!("Failed to create runtime: {e}")).unwrap();
-    let load_balancer = setup_load_balancer(10);
+/// Benchmark round-robin distribution
+fn bench_round_robin_distribution(c: &mut Criterion) {
+    let rt = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("Failed to create runtime: {e}");
+            return;
+        }
+    };
     
     c.bench_function("load_balancer_round_robin", |b| {
         b.iter(|| {
             rt.block_on(async {
+                let load_balancer = setup_load_balancer(10);
+                let mut selections = Vec::with_capacity(100);
+                
                 let start = std::time::Instant::now();
                 
-                // Select multiple endpoints to test round-robin
-                let mut selections = Vec::with_capacity(100);
-                for _ in 0..100 {
+                for _ in 0_i32..100_i32 {
                     if let Ok(endpoint) = load_balancer.select_endpoint().await {
                         selections.push(endpoint.url);
                     }
@@ -91,16 +83,22 @@ fn bench_round_robin_strategy(c: &mut Criterion) {
                 
                 // Verify round-robin distribution
                 let unique_count = selections.iter().collect::<std::collections::HashSet<_>>().len();
-
+                
                 black_box((selections, unique_count, elapsed))
             })
         });
     });
 }
 
-/// Benchmark weighted load balancing
-fn bench_weighted_strategy(c: &mut Criterion) {
-    let rt = Runtime::new().map_err(|e| format!("Failed to create runtime: {e}")).unwrap();
+/// Benchmark weighted round-robin
+fn bench_weighted_round_robin(c: &mut Criterion) {
+    let rt = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("Failed to create runtime: {e}");
+            return;
+        }
+    };
     
     c.bench_function("load_balancer_weighted", |b| {
         b.iter(|| {
@@ -121,78 +119,63 @@ fn bench_weighted_strategy(c: &mut Criterion) {
                         health_check: None,
                     },
                 ];
-
+                
                 let load_balancer = LoadBalancer::new(LoadBalancingStrategy::WeightedRoundRobin, endpoints);
                 
-                let start = std::time::Instant::now();
-                
-                // Test weighted selection
-                let mut high_weight_count = 0;
-                for _ in 0..1000 {
+                let mut high_weight_count = 0_i32;
+                for _ in 0_i32..1_000_i32 {
                     if let Ok(endpoint) = load_balancer.select_endpoint().await {
                         if endpoint.url == "https://api1.example.com" {
-                            high_weight_count += 1;
+                            high_weight_count += 1_i32;
                         }
                     }
                 }
                 
-                let elapsed = start.elapsed();
-                
-                black_box((high_weight_count, elapsed))
+                black_box(high_weight_count)
             })
         });
     });
 }
 
 /// Benchmark health check performance
-fn bench_health_checks(c: &mut Criterion) {
-    let rt = Runtime::new().map_err(|e| format!("Failed to create runtime: {e}")).unwrap();
-    let load_balancer = setup_load_balancer(20);
+fn bench_health_check(c: &mut Criterion) {
+    let rt = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("Failed to create runtime: {e}");
+            return;
+        }
+    };
     
-    c.bench_function("load_balancer_health_checks", |b| {
+    c.bench_function("load_balancer_health_check", |b| {
         b.iter(|| {
             rt.block_on(async {
+                let load_balancer = setup_load_balancer(20);
+                
                 let start = std::time::Instant::now();
                 
                 // Check if load balancer is healthy
-                let _ = load_balancer.is_healthy();
+                let is_healthy = load_balancer.is_healthy();
                 
                 let elapsed = start.elapsed();
                 
-                black_box(elapsed)
+                black_box((is_healthy, elapsed))
             })
         });
     });
 }
 
-/// Benchmark failover performance
-fn bench_failover_performance(c: &mut Criterion) {
-    let rt = Runtime::new().map_err(|e| format!("Failed to create runtime: {e}")).unwrap();
+/// Benchmark concurrent endpoint selection
+fn bench_concurrent_selection(c: &mut Criterion) {
+    let rt = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("Failed to create runtime: {e}");
+            return;
+        }
+    };
     
-    c.bench_function("load_balancer_failover", |b| {
-        b.iter(|| {
-            rt.block_on(async {
-                let load_balancer = setup_load_balancer(5);
-                
-                let start = std::time::Instant::now();
-                
-                // Select endpoint (failover logic is internal)
-                let endpoint = load_balancer.select_endpoint().await;
-                
-                let elapsed = start.elapsed();
-                
-                black_box((endpoint, elapsed))
-            })
-        });
-    });
-}
-
-/// Benchmark concurrent load balancing
-fn bench_concurrent_load_balancing(c: &mut Criterion) {
-    let rt = Runtime::new().map_err(|e| format!("Failed to create runtime: {e}")).unwrap();
-    let load_balancer = setup_load_balancer(10);
-    
-    let concurrency_levels = vec![10, 100, 1000];
+    let concurrency_levels = vec![10, 50, 100];
     
     for concurrency in concurrency_levels {
         c.bench_with_input(
@@ -201,11 +184,12 @@ fn bench_concurrent_load_balancing(c: &mut Criterion) {
             |b, &concurrency| {
                 b.iter(|| {
                     rt.block_on(async {
+                        let load_balancer = setup_load_balancer(5);
                         let mut handles = Vec::with_capacity(concurrency);
                         
                         let start = std::time::Instant::now();
                         
-                        for _ in 0..concurrency {
+                        for _ in 0_i32..concurrency.try_into().unwrap_or(i32::MAX) {
                             let load_balancer = load_balancer.clone();
                             let handle: tokio::task::JoinHandle<NetworkResult<Endpoint>> = tokio::spawn(async move {
                                 load_balancer.select_endpoint().await
@@ -217,11 +201,12 @@ fn bench_concurrent_load_balancing(c: &mut Criterion) {
                         let elapsed = start.elapsed();
                         
                         // Count successful selections
-                        let successful_selections = results.iter()
-                            .filter(|r| r.is_ok() && r.as_ref().unwrap().is_ok())
+                        let successful_count = results
+                            .iter()
+                            .filter(|r| r.is_ok() && r.as_ref().is_ok_and(std::result::Result::is_ok))
                             .count();
                         
-                        black_box((results, successful_selections, elapsed))
+                        black_box((successful_count, elapsed))
                     })
                 });
             },
@@ -229,33 +214,44 @@ fn bench_concurrent_load_balancing(c: &mut Criterion) {
     }
 }
 
-/// Benchmark adaptive load balancing
-fn bench_adaptive_strategy(c: &mut Criterion) {
-    let rt = Runtime::new().map_err(|e| format!("Failed to create runtime: {e}")).unwrap();
+/// Benchmark least connections strategy
+fn bench_least_connections(c: &mut Criterion) {
+    let rt = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("Failed to create runtime: {e}");
+            return;
+        }
+    };
     
-    c.bench_function("load_balancer_adaptive", |b| {
+    c.bench_function("load_balancer_least_connections", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let endpoints = (0..5)
+                let endpoints = (0_i32..5_i32)
                     .map(|i| Endpoint {
-                        url: format!("https://api{}.example.com", i),
+                        url: format!("https://api{i}.example.com"),
                         socket_addr: None,
                         priority: 100,
                         weight: 1,
                         health_check: None,
                     })
                     .collect();
-
+                
                 let load_balancer = LoadBalancer::new(LoadBalancingStrategy::LeastConnections, endpoints);
                 
                 let start = std::time::Instant::now();
                 
-                // Test adaptive selection
-                let endpoint = load_balancer.select_endpoint().await;
+                // Simulate multiple selections
+                let mut selections = Vec::with_capacity(100);
+                for _ in 0_i32..100_i32 {
+                    if let Ok(endpoint) = load_balancer.select_endpoint().await {
+                        selections.push(endpoint.url);
+                    }
+                }
                 
                 let elapsed = start.elapsed();
                 
-                black_box((endpoint, elapsed))
+                black_box((selections, elapsed))
             })
         });
     });
@@ -264,12 +260,11 @@ fn bench_adaptive_strategy(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_endpoint_selection,
-    bench_round_robin_strategy,
-    bench_weighted_strategy,
-    bench_health_checks,
-    bench_failover_performance,
-    bench_concurrent_load_balancing,
-    bench_adaptive_strategy
+    bench_round_robin_distribution,
+    bench_weighted_round_robin,
+    bench_health_check,
+    bench_concurrent_selection,
+    bench_least_connections
 );
 
 criterion_main!(benches);

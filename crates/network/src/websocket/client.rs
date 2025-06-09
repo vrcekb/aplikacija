@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 
 /// WebSocket client implementation (stub for now)
+#[derive(Clone)]
 pub struct WebSocketClient {
     /// Configuration
     config: WebSocketConfig,
