@@ -374,6 +374,14 @@ impl NetworkError {
             message: message.into(),
         }
     }
+
+    /// Create authentication error
+    pub fn authentication(message: impl Into<String>) -> Self {
+        Self::Validation {
+            field: "authentication".to_string(),
+            reason: message.into(),
+        }
+    }
 }
 
 // Convert from domain-specific errors

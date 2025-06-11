@@ -60,6 +60,9 @@ pub mod websocket;
 pub mod load_balancer;
 pub mod p2p;
 
+// Security modules
+pub mod security;
+
 // Utilities and metrics
 pub mod metrics;
 pub mod manager;
@@ -101,6 +104,13 @@ pub mod prelude {
     // Re-export load balancer
     pub use crate::load_balancer::{LoadBalancer, LoadBalancerTrait};
     pub use crate::config::LoadBalancingStrategy;
+
+    // Re-export security
+    pub use crate::security::{
+        SecuritySystem, SecurityRequest, SecurityResult,
+        RateLimitConfig, CertificatePinningConfig, RequestSigningConfig, DoSProtectionConfig,
+        SignatureAlgorithm,
+    };
 
     // Re-export network manager
     pub use crate::manager::NetworkManager;

@@ -1,11 +1,11 @@
 [package]
 name = "tallyio-network"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
-license.workspace = true
-repository.workspace = true
-homepage.workspace = true
+version = "0.1.0"
+edition = "2021"
+authors = ["TallyIO Team <team@tallyio.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/tallyio/tallyio"
+homepage = "https://tallyio.com"
 description = "Ultra-performant network layer for TallyIO with <1ms latency"
 keywords = ["network", "websocket", "http", "p2p", "performance"]
 categories = ["network-programming", "web-programming", "asynchronous"]
@@ -46,6 +46,12 @@ url = "2.5"
 rustls = "0.22"
 rustls-pemfile = "2.0"
 webpki-roots = "0.26"
+x509-parser = "0.16"
+hmac = "0.12"
+sha2 = "0.10"
+subtle = "2.5"
+base64 = "0.22"
+hex = "0.4"
 
 # Metrics & Observability
 tracing = { workspace = true }

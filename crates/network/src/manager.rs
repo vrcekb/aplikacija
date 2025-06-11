@@ -66,7 +66,11 @@ impl NetworkManager {
         let load_balancer = Arc::new(LoadBalancer::new(
             config.load_balancer.strategy,
             config.load_balancer.endpoints.clone(),
-        ));
+            config.load_balancer.health_check.clone(),
+        ).map_err(|e| {
+            error!("Failed to initialize load balancer: {}", e);
+            e
+        })?);
         debug!("Load balancer initialized with {} endpoints", config.load_balancer.endpoints.len());
 
         // Initialize P2P network if configured
@@ -231,13 +235,19 @@ impl NetworkManager {
     }
 
     /// Add endpoint to load balancer
-    pub fn add_endpoint(&self, endpoint: Endpoint) {
-        self.load_balancer.add_endpoint(endpoint);
+    ///
+    /// # Errors
+    /// Returns error if endpoint URL is invalid or already exists
+    pub fn add_endpoint(&self, endpoint: &Endpoint) -> NetworkResult<()> {
+        self.load_balancer.add_endpoint(endpoint)
     }
 
     /// Remove endpoint from load balancer
-    pub fn remove_endpoint(&self, url: &str) {
-        self.load_balancer.remove_endpoint(url);
+    ///
+    /// # Errors
+    /// Returns error if endpoint doesn't exist
+    pub fn remove_endpoint(&self, url: &str) -> NetworkResult<()> {
+        self.load_balancer.remove_endpoint(url)
     }
 
     /// Get comprehensive network statistics

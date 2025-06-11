@@ -8,7 +8,7 @@ use tokio::runtime::Runtime;
 use tallyio_network::prelude::*;
 
 /// Setup load balancer for benchmarks
-fn setup_load_balancer(endpoint_count: usize) -> LoadBalancer {
+fn setup_load_balancer(endpoint_count: usize) -> NetworkResult<LoadBalancer> {
     let endpoints = (0_i32..endpoint_count.try_into().unwrap_or(i32::MAX))
         .map(|i| Endpoint {
             url: format!("https://api{i}.example.com"),
@@ -18,8 +18,12 @@ fn setup_load_balancer(endpoint_count: usize) -> LoadBalancer {
             health_check: None,
         })
         .collect();
-    
-    LoadBalancer::new(LoadBalancingStrategy::RoundRobin, endpoints)
+
+    LoadBalancer::new(
+        LoadBalancingStrategy::RoundRobin,
+        endpoints,
+        HealthCheckConfig::default()
+    )
 }
 
 /// Benchmark endpoint selection latency
@@ -41,14 +45,14 @@ fn bench_endpoint_selection(c: &mut Criterion) {
             |b, &count| {
                 b.iter(|| {
                     rt.block_on(async {
-                        let load_balancer = setup_load_balancer(count);
+                        let Ok(load_balancer) = setup_load_balancer(count) else { return };
                         let start = std::time::Instant::now();
-                        
+
                         let result = load_balancer.select_endpoint().await;
                         let elapsed = start.elapsed();
-                        
-                        black_box((result, elapsed))
-                    })
+
+                        let _ = black_box((result, elapsed));
+                    });
                 });
             },
         );
@@ -68,24 +72,24 @@ fn bench_round_robin_distribution(c: &mut Criterion) {
     c.bench_function("load_balancer_round_robin", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let load_balancer = setup_load_balancer(10);
+                let Ok(load_balancer) = setup_load_balancer(10) else { return };
                 let mut selections = Vec::with_capacity(100);
-                
+
                 let start = std::time::Instant::now();
-                
+
                 for _ in 0_i32..100_i32 {
                     if let Ok(endpoint) = load_balancer.select_endpoint().await {
                         selections.push(endpoint.url);
                     }
                 }
-                
+
                 let elapsed = start.elapsed();
-                
+
                 // Verify round-robin distribution
                 let unique_count = selections.iter().collect::<std::collections::HashSet<_>>().len();
-                
-                black_box((selections, unique_count, elapsed))
-            })
+
+                let _ = black_box((selections, unique_count, elapsed));
+            });
         });
     });
 }
@@ -119,9 +123,13 @@ fn bench_weighted_round_robin(c: &mut Criterion) {
                         health_check: None,
                     },
                 ];
-                
-                let load_balancer = LoadBalancer::new(LoadBalancingStrategy::WeightedRoundRobin, endpoints);
-                
+
+                let Ok(load_balancer) = LoadBalancer::new(
+                    LoadBalancingStrategy::WeightedRoundRobin,
+                    endpoints,
+                    HealthCheckConfig::default()
+                ) else { return };
+
                 let mut high_weight_count = 0_i32;
                 for _ in 0_i32..1_000_i32 {
                     if let Ok(endpoint) = load_balancer.select_endpoint().await {
@@ -130,9 +138,9 @@ fn bench_weighted_round_robin(c: &mut Criterion) {
                         }
                     }
                 }
-                
-                black_box(high_weight_count)
-            })
+
+                let _ = black_box(high_weight_count);
+            });
         });
     });
 }
@@ -150,17 +158,17 @@ fn bench_health_check(c: &mut Criterion) {
     c.bench_function("load_balancer_health_check", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let load_balancer = setup_load_balancer(20);
-                
+                let Ok(load_balancer) = setup_load_balancer(20) else { return };
+
                 let start = std::time::Instant::now();
-                
+
                 // Check if load balancer is healthy
                 let is_healthy = load_balancer.is_healthy();
-                
+
                 let elapsed = start.elapsed();
-                
-                black_box((is_healthy, elapsed))
-            })
+
+                let _ = black_box((is_healthy, elapsed));
+            });
         });
     });
 }
@@ -184,11 +192,11 @@ fn bench_concurrent_selection(c: &mut Criterion) {
             |b, &concurrency| {
                 b.iter(|| {
                     rt.block_on(async {
-                        let load_balancer = setup_load_balancer(5);
+                        let Ok(load_balancer) = setup_load_balancer(5) else { return };
                         let mut handles = Vec::with_capacity(concurrency);
-                        
+
                         let start = std::time::Instant::now();
-                        
+
                         for _ in 0_i32..concurrency.try_into().unwrap_or(i32::MAX) {
                             let load_balancer = load_balancer.clone();
                             let handle: tokio::task::JoinHandle<NetworkResult<Endpoint>> = tokio::spawn(async move {
@@ -196,18 +204,18 @@ fn bench_concurrent_selection(c: &mut Criterion) {
                             });
                             handles.push(handle);
                         }
-                        
+
                         let results = futures::future::join_all(handles).await;
                         let elapsed = start.elapsed();
-                        
+
                         // Count successful selections
                         let successful_count = results
                             .iter()
                             .filter(|r| r.is_ok() && r.as_ref().is_ok_and(std::result::Result::is_ok))
                             .count();
-                        
-                        black_box((successful_count, elapsed))
-                    })
+
+                        let _ = black_box((successful_count, elapsed));
+                    });
                 });
             },
         );
@@ -236,11 +244,15 @@ fn bench_least_connections(c: &mut Criterion) {
                         health_check: None,
                     })
                     .collect();
-                
-                let load_balancer = LoadBalancer::new(LoadBalancingStrategy::LeastConnections, endpoints);
-                
+
+                let Ok(load_balancer) = LoadBalancer::new(
+                    LoadBalancingStrategy::LeastConnections,
+                    endpoints,
+                    HealthCheckConfig::default()
+                ) else { return };
+
                 let start = std::time::Instant::now();
-                
+
                 // Simulate multiple selections
                 let mut selections = Vec::with_capacity(100);
                 for _ in 0_i32..100_i32 {
@@ -248,11 +260,11 @@ fn bench_least_connections(c: &mut Criterion) {
                         selections.push(endpoint.url);
                     }
                 }
-                
+
                 let elapsed = start.elapsed();
-                
-                black_box((selections, elapsed))
-            })
+
+                let _ = black_box((selections, elapsed));
+            });
         });
     });
 }
